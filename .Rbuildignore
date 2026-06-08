@@ -1,0 +1,9 @@
+^\\.Rproj\\.user$
+^\\.github$
+^app$
+^pkgdown$
+^results$
+^output$
+^.*\\.Rproj$
+^\\.targets$
+^\\.tarchetypes$

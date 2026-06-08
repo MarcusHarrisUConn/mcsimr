@@ -1,0 +1,45 @@
+---
+title: "OLS Monte Carlo Simulation"
+format: html
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+library(mcsimr)
+library(yaml)
+```
+
+## Study Design
+
+```{r}
+spec <- yaml::read_yaml("spec.yml")
+class(spec) <- c("mcsimr_ols_spec", "mcsimr_spec", "list")
+spec$study_name
+spec$research_question
+```
+
+## Run Simulation
+
+```{r}
+source("run.R")
+```
+
+## Summary
+
+```{r}
+summary
+```
+
+## Reporting Checklist
+
+- Motivating research question.
+- Prior evidence or theory motivating the selected conditions.
+- Manipulated conditions and rationale for levels.
+- Data-generating model and population values.
+- Fitted model and software details.
+- Performance metrics and interpretation standards.
+- Tables or figures for the most relevant patterns.
+- Conclusions tied back to the research question.

@@ -1,0 +1,7 @@
+url: https://MarcusHarrisUConn.github.io/mcsimr/
+template:
+  bootstrap: 5
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [github]

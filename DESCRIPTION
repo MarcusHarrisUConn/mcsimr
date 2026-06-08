@@ -1,0 +1,33 @@
+Package: mcsimr
+Title: Local Monte Carlo Simulation Workbench
+Version: 0.0.0.9000
+Authors@R: c(
+    person("M.", "H.", email = "maintainer@example.com", role = c("aut", "cre"))
+    )
+Author: M. H.
+Maintainer: M. H. <maintainer@example.com>
+Description: A local-first R package and Shiny app foundation for designing,
+    running, checkpointing, summarizing, and exporting reproducible Monte Carlo
+    simulation studies. The initial engine targets ordinary least squares
+    regression, with the architecture intended to expand to SEM simulations
+    through lavaan.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Depends:
+    R (>= 4.2.0)
+Imports:
+    stats,
+    parallel,
+    future,
+    yaml
+Suggests:
+    shiny,
+    bslib,
+    targets,
+    tarchetypes,
+    quarto,
+    testthat (>= 3.0.0),
+    lavaan
+Config/testthat/edition: 3
