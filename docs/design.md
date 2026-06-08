@@ -42,16 +42,20 @@ the Social Sciences*.
 The first simulation type supports:
 
 - sample size conditions;
+- predictor correlation conditions;
+- residual variance conditions;
 - number of replications;
 - true regression coefficients;
-- common predictor correlation;
-- residual standard deviation;
+- fitted model formula;
+- selected output metrics;
 - alpha level;
 - reproducible RNG seed;
 - local parallel execution;
 - checkpoint files per condition;
-- summary metrics including bias, relative bias, RMSE, coverage, rejection rate,
-  and Monte Carlo standard error for rejection rates.
+- summary metrics including MSE, bias, relative bias, RMSE, coverage, rejection
+  rate, power, Type I error, Monte Carlo standard error, and convergence/errors;
+- APA-style tables;
+- exported visualizations.
 
 ## Execution strategy
 
@@ -60,10 +64,10 @@ checkpoint directory where every condition is written independently as an `.rds`
 file. This gives a simple resume path: completed condition files are read from
 disk instead of rerun.
 
-The initial local backend uses `future.apply` with `future::multisession`.
-That maps well to personal computers. For HPC use, the exported `targets`
-pipeline can be run from a shell script, scheduler job, or future batchtools
-plan in a later version.
+The initial local backend uses base R `parallel` workers because that works
+well on a local Windows desktop without extra dependencies. For HPC use, the
+exported `targets` pipeline can be run from a shell script, scheduler job, or
+future batchtools plan in a later version.
 
 ## Reproducibility strategy
 
@@ -74,10 +78,12 @@ The Quarto export writes:
 - `index.qmd`;
 - `R/simulation.R`;
 - `spec.yml`;
-- `run.R`.
+- `run.R`;
+- `results/apa-table.md`;
+- `results/figures/`.
 
 The exported project should run outside Shiny and produce the same condition
-grid and summary tables.
+grid, raw results, metric summary, APA-style tables, and plots.
 
 ## Later SEM/lavaan module
 

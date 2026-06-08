@@ -8,11 +8,12 @@
 `mcsimr` is a local-first R package and Shiny workbench for Monte Carlo
 simulation studies in the social and behavioral sciences.
 
-The project starts deliberately: ordinary least squares regression simulations,
-condition grids, reproducible seeds, local parallel execution, checkpointed
-results, and exportable Quarto projects. The longer-term goal is a platform for
-larger simulation studies, including structural equation modeling workflows
-with `lavaan`.
+The project starts deliberately: ordinary least squares regression simulations
+with user-defined conditions, reproducible seeds, local parallel execution,
+checkpointed results, automatic simulation metrics, APA-style tables, figures,
+and exportable Quarto projects. The longer-term goal is a platform for larger
+simulation studies, including structural equation modeling workflows with
+`lavaan`.
 
 ## Live demo
 
@@ -34,10 +35,11 @@ performance metrics, and results that are hard to reproduce.
 `mcsimr` is built around a different contract:
 
 - the simulation design is an explicit R object;
+- users specify the model, conditions, seed, replications, and desired metrics;
 - each condition can be checkpointed to disk;
 - local runs can use multiple workers;
 - Shiny choices generate reproducible R code;
-- results can be exported into a Quarto project;
+- results, APA-style tables, plots, and code can be exported into a Quarto project;
 - the design vocabulary follows reviewer-facing Monte Carlo reporting guidance.
 
 ## Install locally
@@ -64,22 +66,24 @@ spec <- ols_sim_spec(
   n = c(100, 250, 500),
   reps = 1000,
   betas = c(0.20, 0.30, 0.00),
-  predictor_correlation = 0.30,
-  error_sd = 1,
+  predictor_correlation = c(0.00, 0.30),
+  error_sd = c(1, 2),
   alpha = 0.05,
   seed = 20260608,
+  fitted_formula = "y ~ x1 + x2 + x3",
   research_question = "How does OLS coefficient recovery vary across sample sizes?"
 )
 
-results <- run_ols_simulation(
+study <- run_simulation_study(
   spec,
   workers = 4,
   checkpoint_dir = "results/checkpoints/ols-demo",
-  resume = TRUE
+  resume = TRUE,
+  output_dir = "results/ols-demo"
 )
 
-summary <- summarize_ols_results(results)
-summary
+study$summary
+cat(paste(study$apa_tables$markdown, collapse = "\n"))
 ```
 
 The summary includes parameter-level performance metrics:
@@ -87,9 +91,12 @@ The summary includes parameter-level performance metrics:
 - mean estimate;
 - bias;
 - relative bias where defined;
+- mean squared error;
 - RMSE;
 - confidence interval coverage;
 - rejection rate;
+- power for nonzero population effects;
+- Type I error for zero population effects;
 - Monte Carlo standard error for rejection rates.
 
 ## Launch the local desktop app
@@ -100,8 +107,10 @@ use_mcsimr_app()
 ```
 
 The local app is the right place for larger runs because it uses the package
-engine and can write checkpoints to disk. For simulations that may run for days
-or weeks, use checkpoint directories and rerun with `resume = TRUE`.
+engine and can write checkpoints to disk. It exposes the first study-builder
+controls: model formula, condition values, seed, replications, workers, selected
+metrics, APA-style table output, and Quarto export. For simulations that may run
+for days or weeks, use checkpoint directories and rerun with `resume = TRUE`.
 
 ## Export a reproducible Quarto project
 
@@ -121,7 +130,8 @@ The exported project contains:
 - `spec.yml`;
 - `run.R`;
 - an `R/` helper folder;
-- a `results/` folder for raw and summarized outputs.
+- a `results/` folder for raw results, metric summaries, APA-style table
+  markdown, and figures.
 
 The goal is that an app-launched simulation never stays trapped inside the app.
 It should become a transparent, rerunnable research artifact.
@@ -170,6 +180,8 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 - [x] Condition-level checkpointing
 - [x] Local parallel execution
 - [x] Summary metrics
+- [x] APA-style metric tables
+- [x] Figure export
 - [x] Local Shiny app
 - [x] Browser demo with Shinylive
 - [x] Quarto export template
@@ -181,6 +193,8 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 - [ ] Progress logs and run registry
 - [ ] Safer resume/restart controls
 - [ ] Batch-size controls for very large replication counts
+- [ ] Condition editor with saved presets
+- [ ] More APA table layouts for parameter-level and condition-level summaries
 - [ ] R package tests
 - [ ] pkgdown documentation site
 

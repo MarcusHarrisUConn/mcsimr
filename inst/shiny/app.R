@@ -9,14 +9,24 @@ ui <- page_sidebar(
     textInput("study_name", "Study name", "OLS Monte Carlo Simulation"),
     textAreaInput("research_question", "Research question", "How does OLS coefficient recovery vary across sample sizes?", rows = 3),
     textInput("n", "Sample sizes", "100, 250, 500"),
+    textInput("condition_rho", "Predictor correlations", "0.30"),
+    textInput("condition_error_sd", "Residual SD conditions", "1"),
     numericInput("reps", "Replications per condition", 100, min = 1, step = 10),
     textInput("betas", "True betas", "0.20, 0.30, 0.00"),
-    numericInput("rho", "Common predictor correlation", 0.30, min = -0.95, max = 0.95, step = 0.05),
-    numericInput("error_sd", "Residual SD", 1, min = 0.01, step = 0.10),
+    textInput("fitted_formula", "Fitted model", "y ~ x1 + x2 + x3"),
+    numericInput("alpha", "Alpha", 0.05, min = 0.001, max = 0.25, step = 0.001),
+    checkboxGroupInput(
+      "metrics",
+      "Output metrics",
+      choices = stats::setNames(metric_catalog("ols")$metric, metric_catalog("ols")$metric),
+      selected = default_metrics("ols")
+    ),
     numericInput("seed", "Seed", 20260608, min = 1, step = 1),
     numericInput("workers", "Workers", max(1, available_cores()), min = 1, step = 1),
     textInput("checkpoint_dir", "Checkpoint directory", "output/checkpoints/ols_app"),
+    textInput("export_path", "Quarto export path", "output/quarto/ols_simulation_project"),
     actionButton("run", "Run simulation", class = "btn-primary"),
+    actionButton("export_quarto", "Export Quarto project"),
     downloadButton("download_summary", "Download summary")
   ),
   layout_column_wrap(
@@ -26,8 +36,16 @@ ui <- page_sidebar(
       tableOutput("summary")
     ),
     card(
+      card_header("APA-style table"),
+      verbatimTextOutput("apa")
+    ),
+    card(
       card_header("Generated R code"),
       verbatimTextOutput("code")
+    ),
+    card(
+      card_header("Export status"),
+      verbatimTextOutput("export_status")
     )
   )
 )
@@ -37,16 +55,20 @@ parse_numeric <- function(x) {
 }
 
 server <- function(input, output, session) {
-  result <- reactiveVal(NULL)
+  study <- reactiveVal(NULL)
+  export_status <- reactiveVal("No project exported yet.")
 
   spec <- reactive({
     ols_sim_spec(
       n = parse_numeric(input$n),
       reps = input$reps,
       betas = parse_numeric(input$betas),
-      predictor_correlation = input$rho,
-      error_sd = input$error_sd,
+      predictor_correlation = parse_numeric(input$condition_rho),
+      error_sd = parse_numeric(input$condition_error_sd),
+      alpha = input$alpha,
       seed = input$seed,
+      fitted_formula = input$fitted_formula,
+      metrics = input$metrics,
       study_name = input$study_name,
       research_question = input$research_question
     )
@@ -54,22 +76,38 @@ server <- function(input, output, session) {
 
   observeEvent(input$run, {
     withProgress(message = "Running OLS simulation", value = 0, {
-      res <- run_ols_simulation(
+      out <- run_simulation_study(
         spec(),
         workers = input$workers,
         checkpoint_dir = input$checkpoint_dir,
         resume = TRUE
       )
       incProgress(0.8)
-      result(summarize_ols_results(res))
+      study(out)
       incProgress(0.2)
     })
   })
 
+  observeEvent(input$export_quarto, {
+    path <- export_quarto_project(
+      spec(),
+      path = input$export_path,
+      overwrite = TRUE,
+      workers = input$workers,
+      checkpoint_dir = "results/checkpoints"
+    )
+    export_status(paste("Exported reproducible Quarto project to:", path))
+  })
+
   output$summary <- renderTable({
-    req(result())
-    result()
+    req(study())
+    study()$summary
   }, striped = TRUE, bordered = TRUE, digits = 4)
+
+  output$apa <- renderText({
+    req(study())
+    paste(study()$apa_tables$markdown, collapse = "\n")
+  })
 
   output$code <- renderText({
     sprintf(
@@ -80,28 +118,35 @@ server <- function(input, output, session) {
         "  n = c(%s),",
         "  reps = %s,",
         "  betas = c(%s),",
-        "  predictor_correlation = %s,",
-        "  error_sd = %s,",
+        "  predictor_correlation = c(%s),",
+        "  error_sd = c(%s),",
+        "  alpha = %s,",
         "  seed = %s,",
+        "  fitted_formula = %s,",
+        "  metrics = c(%s),",
         "  study_name = %s,",
         "  research_question = %s",
         ")",
         "",
-        "results <- run_ols_simulation(",
+        "study <- run_simulation_study(",
         "  spec,",
         "  workers = %s,",
         "  checkpoint_dir = %s,",
         "  resume = TRUE",
         ")",
-        "summary <- summarize_ols_results(results)",
+        "summary <- study$summary",
+        "apa_table <- study$apa_tables",
         sep = "\n"
       ),
       paste(parse_numeric(input$n), collapse = ", "),
       input$reps,
       paste(parse_numeric(input$betas), collapse = ", "),
-      input$rho,
-      input$error_sd,
+      paste(parse_numeric(input$condition_rho), collapse = ", "),
+      paste(parse_numeric(input$condition_error_sd), collapse = ", "),
+      input$alpha,
       input$seed,
+      deparse(input$fitted_formula),
+      paste(sprintf('"%s"', input$metrics), collapse = ", "),
       deparse(input$study_name),
       deparse(input$research_question),
       input$workers,
@@ -109,10 +154,14 @@ server <- function(input, output, session) {
     )
   })
 
+  output$export_status <- renderText({
+    export_status()
+  })
+
   output$download_summary <- downloadHandler(
     filename = function() "mcsimr-summary.csv",
     content = function(file) {
-      write.csv(result(), file, row.names = FALSE)
+      write.csv(study()$summary, file, row.names = FALSE)
     }
   )
 }

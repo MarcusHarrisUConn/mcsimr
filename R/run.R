@@ -1,18 +1,26 @@
 run_replication <- function(spec, n, rep_id, condition_id = 1L) {
   validate_ols_spec(spec)
+  if (is.null(spec$current_predictor_correlation)) {
+    spec$current_predictor_correlation <- spec$predictor_correlation[1L]
+  }
+  if (is.null(spec$current_error_sd)) {
+    spec$current_error_sd <- spec$error_sd[1L]
+  }
   dat <- generate_ols_data(
     n = n,
     betas = spec$betas,
     intercept = spec$intercept,
-    predictor_correlation = spec$predictor_correlation,
-    error_sd = spec$error_sd
+    predictor_correlation = spec$current_predictor_correlation,
+    error_sd = spec$current_error_sd
   )
 
-  fit <- tryCatch(fit_ols_model(dat), error = identity)
+  fit <- tryCatch(fit_ols_model(dat, spec$fitted_formula), error = identity)
   if (inherits(fit, "error")) {
     return(data.frame(
       condition_id = condition_id,
       n = n,
+      predictor_correlation = spec$current_predictor_correlation,
+      error_sd = spec$current_error_sd,
       rep_id = rep_id,
       term = NA_character_,
       estimate = NA_real_,
@@ -32,17 +40,22 @@ run_replication <- function(spec, n, rep_id, condition_id = 1L) {
   estimates <- extract_ols_estimates(fit, spec$betas, spec$alpha)
   estimates$condition_id <- condition_id
   estimates$n <- n
+  estimates$predictor_correlation <- spec$current_predictor_correlation
+  estimates$error_sd <- spec$current_error_sd
   estimates$rep_id <- rep_id
   estimates$alpha <- spec$alpha
   estimates$converged <- TRUE
   estimates$error <- NA_character_
   estimates[c("condition_id", "n", "rep_id", "term", "estimate", "std_error",
-              "statistic", "p_value", "conf_low", "conf_high", "true_value",
-              "alpha", "converged", "error")]
+              "predictor_correlation", "error_sd", "statistic", "p_value",
+              "conf_low", "conf_high", "true_value", "alpha", "converged",
+              "error")]
 }
 
 run_condition <- function(spec, condition, workers = 1L) {
   validate_ols_spec(spec)
+  spec$current_predictor_correlation <- condition$predictor_correlation
+  spec$current_error_sd <- condition$error_sd
   reps <- seq_len(spec$reps)
 
   if (workers > 1L) {
@@ -110,4 +123,41 @@ run_ols_simulation <- function(spec,
   out <- do.call(rbind, results)
   rownames(out) <- NULL
   out
+}
+
+run_simulation_study <- function(spec,
+                                 workers = 1L,
+                                 checkpoint_dir = NULL,
+                                 resume = TRUE,
+                                 output_dir = NULL) {
+  validate_ols_spec(spec)
+  raw <- run_ols_simulation(
+    spec = spec,
+    workers = workers,
+    checkpoint_dir = checkpoint_dir,
+    resume = resume
+  )
+  summary <- summarize_ols_results(raw, metrics = spec$metrics)
+  apa <- apa_metric_table(summary, metrics = spec$metrics)
+
+  bundle <- list(
+    spec = spec,
+    raw_results = raw,
+    summary = summary,
+    apa_tables = apa,
+    metric_catalog = metric_catalog(spec$type),
+    created_at = as.character(Sys.time())
+  )
+  class(bundle) <- c("mcsimr_study", "list")
+
+  if (!is.null(output_dir)) {
+    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+    saveRDS(bundle, file.path(output_dir, "simulation-study.rds"))
+    utils::write.csv(raw, file.path(output_dir, "raw-results.csv"), row.names = FALSE)
+    utils::write.csv(summary, file.path(output_dir, "metric-summary.csv"), row.names = FALSE)
+    write_apa_tables(apa, file.path(output_dir, "apa-tables.md"))
+    save_metric_plots(summary, file.path(output_dir, "figures"))
+  }
+
+  bundle
 }

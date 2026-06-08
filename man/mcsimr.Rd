@@ -1,13 +1,20 @@
 \name{mcsimr}
 \alias{mcsimr}
 \alias{available_cores}
+\alias{apa_metric_table}
+\alias{default_metrics}
 \alias{export_quarto_project}
+\alias{metric_catalog}
 \alias{ols_sim_spec}
+\alias{plot_metric}
 \alias{run_condition}
 \alias{run_ols_simulation}
 \alias{run_replication}
+\alias{run_simulation_study}
+\alias{save_metric_plots}
 \alias{summarize_ols_results}
 \alias{use_mcsimr_app}
+\alias{write_apa_tables}
 \title{Local Monte Carlo simulation workbench}
 \description{
 Core functions for defining, running, checkpointing, summarizing, and exporting
@@ -17,10 +24,15 @@ least squares regression simulations.
 \usage{
 available_cores(reserve = 1L)
 
+metric_catalog(model = c("ols", "sem"))
+
+default_metrics(model = c("ols", "sem"))
+
 ols_sim_spec(n = c(100, 250, 500), reps = 1000,
   betas = c(0.20, 0.30, 0.00), intercept = 0,
   predictor_correlation = 0, error_sd = 1, alpha = 0.05,
-  seed = 20260608, study_name = "OLS Monte Carlo Simulation",
+  seed = 20260608, fitted_formula = NULL,
+  metrics = default_metrics("ols"), study_name = "OLS Monte Carlo Simulation",
   research_question = "How does OLS coefficient recovery vary across sample sizes?")
 
 run_replication(spec, n, rep_id, condition_id = 1L)
@@ -29,7 +41,21 @@ run_condition(spec, condition, workers = 1L)
 
 run_ols_simulation(spec, workers = 1L, checkpoint_dir = NULL, resume = TRUE)
 
-summarize_ols_results(results)
+run_simulation_study(spec, workers = 1L, checkpoint_dir = NULL,
+  resume = TRUE, output_dir = NULL)
+
+summarize_ols_results(results, metrics = default_metrics("ols"))
+
+apa_metric_table(summary, metrics = default_metrics("ols"), digits = 3L,
+  caption = "Table 1\\nMonte Carlo simulation performance metrics by condition and parameter.")
+
+write_apa_tables(apa_table, path)
+
+plot_metric(summary, metric = "bias", term = NULL, path = NULL,
+  width = 900, height = 650)
+
+save_metric_plots(summary, path,
+  metrics = intersect(c("bias", "rmse", "coverage", "power", "type_i_error"), names(summary)))
 
 export_quarto_project(spec, path, overwrite = FALSE, workers = 1L,
   checkpoint_dir = "results/checkpoints")
@@ -46,8 +72,11 @@ use_mcsimr_app(...)
 \item{error_sd}{Residual standard deviation.}
 \item{alpha}{Nominal alpha level.}
 \item{seed}{Base random seed.}
+\item{fitted_formula}{Formula string for the model fitted to each generated data set.}
+\item{metrics}{Metrics to include in summaries and APA-style tables.}
 \item{study_name}{Human-readable study name.}
 \item{research_question}{Human-readable motivating question.}
+\item{model}{Simulation model family.}
 \item{spec}{Simulation specification created by \code{ols_sim_spec()}.}
 \item{rep_id}{Replication identifier.}
 \item{condition_id}{Condition identifier.}
@@ -55,8 +84,17 @@ use_mcsimr_app(...)
 \item{workers}{Number of local parallel workers.}
 \item{checkpoint_dir}{Directory for checkpointed condition results.}
 \item{resume}{Whether completed checkpoint files should be reused.}
+\item{output_dir}{Optional directory for raw results, summaries, APA table markdown, plots, and the serialized study bundle.}
 \item{results}{Raw simulation result data frame.}
+\item{summary}{Simulation metric summary data frame.}
+\item{digits}{Number of digits for APA-style numeric display.}
+\item{caption}{APA-style table caption.}
+\item{apa_table}{APA table object created by \code{apa_metric_table()}.}
+\item{metric}{Metric to plot.}
+\item{term}{Optional parameter term filter for plots.}
 \item{path}{Export destination for a Quarto project.}
+\item{width}{PNG width in pixels.}
+\item{height}{PNG height in pixels.}
 \item{overwrite}{Whether template files may be overwritten.}
 \item{...}{Arguments passed to \code{shiny::runApp()}.}
 }

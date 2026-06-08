@@ -1,9 +1,12 @@
-^\\.Rproj\\.user$
-^\\.github$
+^[.]Rproj[.]user$
+^[.]git$
+^[.]github$
+^.*[.]Rcheck$
 ^app$
 ^pkgdown$
 ^results$
 ^output$
-^.*\\.Rproj$
-^\\.targets$
-^\\.tarchetypes$
+^.*[.]Rproj$
+^[.]targets$
+^[.]tarchetypes$
+^mcsimr_.*[.]tar[.]gz$

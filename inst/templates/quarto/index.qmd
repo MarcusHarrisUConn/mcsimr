@@ -27,10 +27,26 @@ spec$research_question
 source("run.R")
 ```
 
-## Summary
+## APA-Style Performance Table
+
+```{r}
+cat(paste(apa_table$markdown, collapse = "\n"))
+```
+
+## Metric Summary
 
 ```{r}
 summary
+```
+
+## Visualizations
+
+```{r}
+figure_dir <- "results/figures"
+if (dir.exists(figure_dir)) {
+  files <- list.files(figure_dir, pattern = "[.]png$", full.names = TRUE)
+  knitr::include_graphics(files)
+}
 ```
 
 ## Reporting Checklist

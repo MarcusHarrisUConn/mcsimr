@@ -26,11 +26,16 @@ export_quarto_project <- function(spec,
     "",
     "spec <- yaml::read_yaml('spec.yml')",
     "class(spec) <- c('mcsimr_ols_spec', 'mcsimr_spec', 'list')",
-    sprintf("results <- run_ols_simulation(spec, workers = %d, checkpoint_dir = '%s')", workers, checkpoint_dir),
-    "summary <- summarize_ols_results(results)",
     "dir.create('results', showWarnings = FALSE)",
-    "saveRDS(results, 'results/raw_results.rds')",
-    "write.csv(summary, 'results/summary.csv', row.names = FALSE)"
+    sprintf(
+      "study <- run_simulation_study(spec, workers = %d, checkpoint_dir = '%s', output_dir = 'results')",
+      workers,
+      checkpoint_dir
+    ),
+    "results <- study$raw_results",
+    "summary <- study$summary",
+    "apa_table <- study$apa_tables",
+    "writeLines(apa_table$markdown, 'results/apa-table.md')"
   ), file.path(path, "run.R"))
 
   invisible(normalizePath(path, winslash = "/", mustWork = FALSE))

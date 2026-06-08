@@ -6,4 +6,7 @@
 .tarchetypes/
 results/
 output/
+tmp/
 *.Rcheck/
+*.tar.gz
+*.Rcheck

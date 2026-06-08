@@ -16,9 +16,12 @@ generate_ols_data <- function(n, betas, intercept, predictor_correlation, error_
   data.frame(y = y, x, check.names = FALSE)
 }
 
-fit_ols_model <- function(dat) {
-  predictors <- setdiff(names(dat), "y")
-  form <- stats::as.formula(paste("y ~", paste(predictors, collapse = " + ")))
+fit_ols_model <- function(dat, fitted_formula = NULL) {
+  if (is.null(fitted_formula)) {
+    predictors <- setdiff(names(dat), "y")
+    fitted_formula <- paste("y ~", paste(predictors, collapse = " + "))
+  }
+  form <- stats::as.formula(fitted_formula)
   stats::lm(form, data = dat)
 }
 
