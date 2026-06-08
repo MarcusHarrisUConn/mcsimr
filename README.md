@@ -18,7 +18,7 @@ with `lavaan`.
 
 After GitHub Pages finishes deploying, the browser demo will be available at:
 
-<https://MarcusHarrisUConn.github.io/mcsimr/>
+<http://marcusharrisphd.com/mcsimr/>
 
 The live demo is powered by Shinylive, so it runs entirely in the browser. It is
 meant for small demonstrations and teaching examples. Large simulations should
