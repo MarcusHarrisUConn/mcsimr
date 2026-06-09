@@ -153,12 +153,19 @@ use_mcsimr_app()
 ```
 
 The local app is the right place for larger runs because it uses the package
-engine and can write checkpoints to disk. It now defaults to a lavaan SEM
-builder with controls for population syntax, fitted syntax, sample-size
-conditions, estimator conditions, seed, replications, workers, selected metrics,
-APA-style table output, rendered equations, raw LaTeX, and Quarto export. For
-simulations that may run for days or weeks, use checkpoint directories and rerun
-with `resume = TRUE`.
+engine and can write checkpoints to disk. It now uses a tabbed workflow:
+
+- **Model Builder**: build lavaan SEM syntax from latent variables, indicators,
+  loadings, covariances, and structural paths, or edit raw lavaan syntax.
+- **Results**: inspect simulation summaries and APA-style tables.
+- **Visualizations**: plot metrics such as bias, RMSE, coverage, power, Type I
+  error, and SEM fit indices.
+- **R Code**: copy the fully reproducible code generated from the current setup.
+- **Quarto Export**: write a runnable Quarto project with code, tables, figures,
+  rendered equations, and raw LaTeX.
+
+For simulations that may run for days or weeks, use checkpoint directories and
+rerun with `resume = TRUE`.
 
 ## Export a reproducible Quarto project
 

@@ -16,6 +16,19 @@ summaries, checkpointing, and reproducible exports.
 - `examples/ols-targets/`: `targets` workflow starter.
 - `docs/`: design notes and methodological guidance.
 
+## App workflow
+
+The Shiny app should be organized around task-specific tabs rather than a long
+single page:
+
+- Model Builder: construct SEM measurement, covariance, and structural syntax,
+  with raw lavaan syntax still editable.
+- Results: show metric summaries and APA-style tables.
+- Visualizations: plot selected metrics by condition and parameter.
+- R Code: show the generated reproducible R script.
+- Quarto Export: write a complete project with code, tables, figures, rendered
+  equations, and raw LaTeX.
+
 ## Monte Carlo study design checklist
 
 The app and exported Quarto project should ask users to document:

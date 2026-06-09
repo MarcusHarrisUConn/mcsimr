@@ -1,6 +1,86 @@
 library(shiny)
 library(bslib)
 
+parse_numeric <- function(x) {
+  as.numeric(trimws(strsplit(x, ",", fixed = TRUE)[[1]]))
+}
+
+split_csv <- function(x) {
+  trimws(strsplit(x, ",", fixed = TRUE)[[1]])
+}
+
+parse_named_lines <- function(x) {
+  lines <- trimws(unlist(strsplit(x, "\n", fixed = TRUE)))
+  lines <- lines[nzchar(lines)]
+  out <- list()
+  for (line in lines) {
+    parts <- strsplit(line, ":", fixed = TRUE)[[1]]
+    if (length(parts) >= 2) {
+      out[[trimws(parts[1])]] <- split_csv(paste(parts[-1], collapse = ":"))
+    }
+  }
+  out
+}
+
+strip_numeric_multipliers <- function(x) {
+  x <- gsub("(^|[+~])\\s*-?[0-9.]+\\s*\\*", "\\1 ", x)
+  gsub("\\s+", " ", trimws(x))
+}
+
+build_sem_syntax <- function(factor_names, indicator_text, loading_text, factor_covariances, structural_paths) {
+  factors <- split_csv(factor_names)
+  indicators <- parse_named_lines(indicator_text)
+  loadings <- parse_named_lines(loading_text)
+  population <- character()
+  fitted <- character()
+
+  for (factor in factors) {
+    inds <- indicators[[factor]]
+    if (is.null(inds)) next
+    loads <- suppressWarnings(as.numeric(loadings[[factor]]))
+    if (length(loads) != length(inds) || any(is.na(loads))) {
+      loads <- rep(0.70, length(inds))
+    }
+    population <- c(population, paste0(factor, " =~ ", paste(paste0(format(loads, trim = TRUE), "*", inds), collapse = " + ")))
+    fitted <- c(fitted, paste0(factor, " =~ ", paste(inds, collapse = " + ")))
+    population <- c(population, paste0(factor, " ~~ 1*", factor))
+    residuals <- pmax(0.001, 1 - loads^2)
+    population <- c(population, paste0(inds, " ~~ ", format(residuals, trim = TRUE), "*", inds))
+  }
+
+  cov_lines <- trimws(unlist(strsplit(factor_covariances, "\n", fixed = TRUE)))
+  cov_lines <- cov_lines[nzchar(cov_lines)]
+  path_lines <- trimws(unlist(strsplit(structural_paths, "\n", fixed = TRUE)))
+  path_lines <- path_lines[nzchar(path_lines)]
+  population <- c(population, cov_lines, path_lines)
+  fitted <- c(fitted, strip_numeric_multipliers(cov_lines), strip_numeric_multipliers(path_lines))
+
+  list(population = paste(population, collapse = "\n"), fitted = paste(fitted, collapse = "\n"))
+}
+
+sem_model_latex <- function(model) {
+  lines <- trimws(unlist(strsplit(model, "\n", fixed = TRUE)))
+  lines <- lines[nzchar(lines)]
+  lines <- lines[!grepl("^#", lines)]
+  out <- character()
+  for (line in lines) {
+    if (grepl("=~", line, fixed = TRUE)) {
+      parts <- strsplit(line, "=~", fixed = TRUE)[[1]]
+      lhs <- trimws(parts[1])
+      rhs_terms <- trimws(unlist(strsplit(parts[2], "+", fixed = TRUE)))
+      rhs <- paste0("\\lambda_{", seq_along(rhs_terms), "}", gsub(".*[*]", "", rhs_terms), collapse = " + ")
+      out <- c(out, paste0(lhs, " = ", rhs))
+    } else if (grepl("~~", line, fixed = TRUE)) {
+      parts <- trimws(strsplit(line, "~~", fixed = TRUE)[[1]])
+      out <- c(out, paste0("\\mathrm{Cov}(", parts[1], ", ", parts[2], ")"))
+    } else if (grepl("~", line, fixed = TRUE)) {
+      parts <- strsplit(line, "~", fixed = TRUE)[[1]]
+      out <- c(out, paste0(trimws(parts[1]), " = ", strip_numeric_multipliers(parts[2]), " + \\varepsilon"))
+    }
+  }
+  out
+}
+
 make_predictor_cov <- function(p, rho) {
   mat <- matrix(rho, nrow = p, ncol = p)
   diag(mat) <- 1
@@ -99,52 +179,66 @@ ui <- page_sidebar(
     width = 340,
     textInput("n", "Sample sizes", "100, 250, 500"),
     numericInput("reps", "Replications", 50, min = 1, max = 500, step = 10),
-    textInput("betas", "True betas", "0.20, 0.30, 0.00"),
-    textInput("rho", "Predictor correlations", "0.30"),
-    textInput("error_sd", "Residual SD conditions", "1"),
-    textInput("fitted_formula", "Fitted model", "y ~ x1 + x2 + x3"),
     numericInput("alpha", "Alpha", 0.05, min = 0.001, max = 0.25, step = 0.001),
     numericInput("seed", "Seed", 20260608, min = 1, step = 1),
-    actionButton("run", "Run demo", class = "btn-primary")
+    actionButton("run", "Run OLS demo", class = "btn-primary")
   ),
-  layout_column_wrap(
-    width = 1,
-    card(
-      card_header("OLS simulation summary"),
-      tableOutput("summary")
+  navset_tab(
+    nav_panel(
+      "Model Builder",
+      layout_columns(
+        col_widths = c(4, 8),
+        card(
+          card_header("SEM syntax builder"),
+          textInput("factor_names", "Latent variables", "f"),
+          textAreaInput("indicator_map", "Indicators by factor", "f: y1, y2, y3", rows = 3),
+          textAreaInput("loading_map", "Population loadings by factor", "f: 0.70, 0.80, 0.90", rows = 3),
+          textAreaInput("factor_covariances", "Factor covariances", "", rows = 3),
+          textAreaInput("structural_paths", "Structural regressions", "", rows = 3),
+          actionButton("build_sem", "Build lavaan syntax")
+        ),
+        card(
+          card_header("Generated lavaan syntax"),
+          textAreaInput("population_model", "Population model", "f =~ 0.70*y1 + 0.80*y2 + 0.90*y3\nf ~~ 1*f\ny1 ~~ 0.51*y1\ny2 ~~ 0.36*y2\ny3 ~~ 0.19*y3", rows = 8),
+          textAreaInput("fitted_model", "Fitted lavaan model", "f =~ y1 + y2 + y3", rows = 5),
+          uiOutput("equations"),
+          verbatimTextOutput("equations_raw")
+        )
+      )
     ),
-    card(
-      card_header("APA-style table"),
-      verbatimTextOutput("apa")
+    nav_panel(
+      "Results",
+      card(card_header("OLS demo summary"), tableOutput("summary")),
+      card(card_header("APA-style table"), verbatimTextOutput("apa"))
     ),
-    card(
-      card_header("Reproducible R code"),
-      verbatimTextOutput("code")
-    )
+    nav_panel(
+      "Visualizations",
+      layout_columns(
+        col_widths = c(3, 9),
+        card(card_header("Plot controls"), selectInput("plot_metric", "Metric", c("bias", "rmse", "coverage", "power", "type_i_error"))),
+        card(card_header("Metric plot"), plotOutput("metric_plot", height = "520px"))
+      )
+    ),
+    nav_panel("R Code", card(card_header("Generated R code"), verbatimTextOutput("code"))),
+    nav_panel("Quarto Export", card(card_header("Quarto export scaffold"), verbatimTextOutput("quarto_note")))
   )
 )
-
-parse_numeric <- function(x) {
-  as.numeric(trimws(strsplit(x, ",", fixed = TRUE)[[1]]))
-}
 
 server <- function(input, output, session) {
   summary_tbl <- reactiveVal(NULL)
 
+  observeEvent(input$build_sem, {
+    syntax <- build_sem_syntax(input$factor_names, input$indicator_map, input$loading_map, input$factor_covariances, input$structural_paths)
+    updateTextAreaInput(session, "population_model", value = syntax$population)
+    updateTextAreaInput(session, "fitted_model", value = syntax$fitted)
+  })
+
   observeEvent(input$run, {
     n_values <- parse_numeric(input$n)
-    betas <- parse_numeric(input$betas)
-    rho_values <- parse_numeric(input$rho)
-    error_values <- parse_numeric(input$error_sd)
-    validate(
-      need(all(!is.na(n_values)), "Sample sizes must be comma-separated numbers."),
-      need(all(!is.na(betas)), "True betas must be comma-separated numbers."),
-      need(all(!is.na(rho_values)), "Predictor correlations must be comma-separated numbers."),
-      need(all(!is.na(error_values)), "Residual SD conditions must be comma-separated numbers."),
-      need(all(rho_values > -1 / (length(betas) - 1)), "A predictor correlation is too negative for this number of predictors.")
-    )
-
-    withProgress(message = "Running browser demo", value = 0, {
+    betas <- c(0.20, 0.30, 0.00)
+    rho_values <- 0.30
+    error_values <- 1
+    withProgress(message = "Running browser OLS demo", value = 0, {
       set.seed(input$seed)
       grid <- expand.grid(n = n_values, predictor_correlation = rho_values, error_sd = error_values)
       grid$condition_id <- seq_len(nrow(grid))
@@ -153,15 +247,20 @@ server <- function(input, output, session) {
         condition <- grid[row_id, ]
         lapply(seq_len(input$reps), function(i) {
           incProgress(1 / total)
-          run_one_rep(
-            condition$n, betas, condition$predictor_correlation, condition$error_sd,
-            input$alpha, input$fitted_formula, condition$condition_id, i
-          )
+          run_one_rep(condition$n, betas, condition$predictor_correlation, condition$error_sd, input$alpha, "y ~ x1 + x2 + x3", condition$condition_id, i)
         })
       }), recursive = FALSE)
-      summary <- summarize_results(do.call(rbind, reps), input$alpha)
-      summary_tbl(summary)
+      summary_tbl(summarize_results(do.call(rbind, reps), input$alpha))
     })
+  })
+
+  output$equations <- renderUI({
+    eqs <- sem_model_latex(input$fitted_model)
+    tagList(lapply(eqs, function(eq) withMathJax(sprintf("$$%s$$", eq))))
+  })
+
+  output$equations_raw <- renderText({
+    paste(sem_model_latex(input$fitted_model), collapse = "\n")
   })
 
   output$apa <- renderText({
@@ -174,36 +273,52 @@ server <- function(input, output, session) {
     summary_tbl()
   }, striped = TRUE, bordered = TRUE, digits = 4)
 
+  output$metric_plot <- renderPlot({
+    req(summary_tbl())
+    req(input$plot_metric %in% names(summary_tbl()))
+    dat <- summary_tbl()
+    plot(dat$n, dat[[input$plot_metric]], type = "n", xlab = "Sample size", ylab = input$plot_metric)
+    terms <- unique(dat$term)
+    cols <- stats::setNames(seq_along(terms), terms)
+    for (tm in terms) {
+      piece <- dat[dat$term == tm, ]
+      lines(piece$n, piece[[input$plot_metric]], type = "b", col = cols[[tm]], pch = cols[[tm]])
+    }
+    legend("topright", legend = terms, col = cols, pch = cols, lty = 1, bty = "n")
+  })
+
   output$code <- renderText({
     sprintf(
       paste(
         "library(mcsimr)",
         "",
-        "spec <- ols_sim_spec(",
+        "population_model <- %s",
+        "fitted_model <- %s",
+        "",
+        "spec <- sem_sim_spec(",
+        "  population_model = population_model,",
+        "  fitted_model = fitted_model,",
         "  n = c(%s),",
         "  reps = %s,",
-        "  betas = c(%s),",
-        "  predictor_correlation = c(%s),",
-        "  error_sd = c(%s),",
-        "  alpha = %s,",
-        "  seed = %s,",
-        "  fitted_formula = %s",
+        "  estimator = 'ML',",
+        "  seed = %s",
         ")",
         "",
-        "study <- run_simulation_study(spec, workers = 1, checkpoint_dir = 'results/checkpoints')",
+        "study <- run_simulation_study(spec, workers = 4, checkpoint_dir = 'results/checkpoints')",
         "summary <- study$summary",
-        "apa_table <- study$apa_tables",
+        "equations_latex <- study$equations_latex",
         sep = "\n"
       ),
+      deparse(input$population_model),
+      deparse(input$fitted_model),
       paste(parse_numeric(input$n), collapse = ", "),
       input$reps,
-      paste(parse_numeric(input$betas), collapse = ", "),
-      paste(parse_numeric(input$rho), collapse = ", "),
-      paste(parse_numeric(input$error_sd), collapse = ", "),
-      input$alpha,
-      input$seed,
-      deparse(input$fitted_formula)
+      input$seed
     )
+  })
+
+  output$quarto_note <- renderText({
+    "The full local app can export a runnable Quarto project with spec.yml, run.R, APA tables, figures, rendered model equations, and raw LaTeX equation files."
   })
 }
 
