@@ -5,6 +5,50 @@ parse_numeric <- function(x) {
   as.numeric(trimws(strsplit(x, ",", fixed = TRUE)[[1]]))
 }
 
+app_css <- "
+:root {
+  --mc-red: #4A0101;
+  --mc-red-2: #7A0610;
+  --mc-accent: #C1121F;
+  --mc-bg: #FFF8F7;
+  --mc-panel: #FFFFFF;
+  --mc-text: #241516;
+  --mc-muted: #6E5558;
+  --mc-border: #E8C8C8;
+}
+body.mc-dark {
+  --mc-bg: #180405;
+  --mc-panel: #250708;
+  --mc-text: #FFF4F1;
+  --mc-muted: #E8B8B4;
+  --mc-border: #5C171B;
+}
+body { background: var(--mc-bg); color: var(--mc-text); }
+.card { border-color: var(--mc-border); background: var(--mc-panel); border-radius: 8px; box-shadow: 0 10px 24px rgba(74, 1, 1, 0.08); }
+.card-header { background: linear-gradient(90deg, var(--mc-red), var(--mc-red-2)); color: #FFF4F1; border-bottom: 0; font-weight: 700; }
+.nav-tabs .nav-link.active { color: #fff; background: var(--mc-red); border-color: var(--mc-red); }
+.nav-tabs .nav-link { color: var(--mc-red-2); }
+body.mc-dark .nav-tabs .nav-link { color: #FFD5D0; }
+.btn-primary, .btn-default.action-button { background: var(--mc-accent); border-color: var(--mc-accent); color: #fff; }
+.form-control, .selectize-input, textarea { background: var(--mc-panel) !important; color: var(--mc-text) !important; border-color: var(--mc-border) !important; }
+.apa-table { width: 100%; border-collapse: collapse; font-family: Georgia, 'Times New Roman', serif; font-size: 0.92rem; }
+.apa-table caption { caption-side: top; text-align: left; font-weight: 700; color: var(--mc-text); padding-bottom: .65rem; }
+.apa-table thead th { border-top: 2px solid var(--mc-text); border-bottom: 1px solid var(--mc-text); font-weight: 700; }
+.apa-table tbody td { border-bottom: 1px solid var(--mc-border); }
+.apa-table tbody tr:last-child td { border-bottom: 2px solid var(--mc-text); }
+.apa-table th, .apa-table td { padding: .45rem .55rem; vertical-align: top; }
+"
+
+app_script <- "
+$(document).on('shiny:connected shiny:inputchanged', function() {
+  var dark = $('#theme_dark').is(':checked');
+  $('body').toggleClass('mc-dark', dark);
+});
+$(document).on('change', '#theme_dark', function() {
+  $('body').toggleClass('mc-dark', this.checked);
+});
+"
+
 split_csv <- function(x) {
   trimws(strsplit(x, ",", fixed = TRUE)[[1]])
 }
@@ -172,11 +216,101 @@ markdown_table <- function(tab) {
   )
 }
 
+apa_table_ui <- function(tab) {
+  display <- tab
+  for (nm in names(display)) {
+    if (is.numeric(display[[nm]]) && !nm %in% c("condition_id", "n", "reps")) {
+      display[[nm]] <- ifelse(is.na(display[[nm]]), "", formatC(display[[nm]], format = "f", digits = 3))
+    }
+  }
+  names(display) <- c(
+    "Condition", "N", "Predictor r", "Residual SD", "Parameter", "Population",
+    "Replications", "Mean estimate", "Bias", "MSE", "RMSE", "Coverage",
+    "Rejection rate", "Power", "Type I error"
+  )
+  tagList(
+    tags$table(
+      class = "apa-table",
+      tags$caption("Table 1. Monte Carlo simulation performance metrics by condition and parameter."),
+      tags$thead(tags$tr(lapply(names(display), tags$th))),
+      tags$tbody(lapply(seq_len(nrow(display)), function(i) tags$tr(lapply(display[i, , drop = TRUE], tags$td))))
+    )
+  )
+}
+
+quarto_files <- function(population_model, fitted_model, n, reps, seed) {
+  run_r <- sprintf(
+    paste(
+      "library(mcsimr)",
+      "",
+      "population_model <- %s",
+      "fitted_model <- %s",
+      "",
+      "spec <- sem_sim_spec(",
+      "  population_model = population_model,",
+      "  fitted_model = fitted_model,",
+      "  n = c(%s),",
+      "  reps = %s,",
+      "  estimator = 'ML',",
+      "  seed = %s",
+      ")",
+      "",
+      "study <- run_simulation_study(spec, workers = 4, checkpoint_dir = 'results/checkpoints', output_dir = 'results')",
+      "summary <- study$summary",
+      "apa_table <- study$apa_tables",
+      "equations_latex <- study$equations_latex",
+      sep = "\n"
+    ),
+    deparse(population_model),
+    deparse(fitted_model),
+    paste(parse_numeric(n), collapse = ", "),
+    reps,
+    seed
+  )
+  list(
+    "run.R" = run_r,
+    "index.qmd" = paste(
+      "---",
+      "title: 'mcsimr lavaan simulation'",
+      "format: html",
+      "---",
+      "",
+      "```{r}",
+      "source('run.R')",
+      "```",
+      "",
+      "## Model Equations",
+      "",
+      "```{r, results='asis'}",
+      "for (eq in equations_latex) cat('$$\\n', eq, '\\n$$\\n\\n', sep = '')",
+      "```",
+      "",
+      "## APA Table",
+      "",
+      "```{r, results='asis'}",
+      "cat(paste(apa_table$markdown, collapse = '\\n'))",
+      "```",
+      sep = "\n"
+    ),
+    "spec.yml" = paste(
+      "type: sem",
+      paste0("n: [", paste(parse_numeric(n), collapse = ", "), "]"),
+      paste0("reps: ", reps),
+      paste0("seed: ", seed),
+      "estimator: ML",
+      sep = "\n"
+    ),
+    "results/model-equations.tex" = paste(sem_model_latex(fitted_model), collapse = "\n")
+  )
+}
+
 ui <- page_sidebar(
   title = "mcsimr live demo",
-  theme = bs_theme(version = 5, bootswatch = "flatly"),
+  theme = bs_theme(version = 5, bootswatch = "flatly", primary = "#7A0610"),
+  tags$head(tags$style(HTML(app_css)), tags$script(HTML(app_script))),
   sidebar = sidebar(
     width = 340,
+    checkboxInput("theme_dark", "Dark mode", FALSE),
     textInput("n", "Sample sizes", "100, 250, 500"),
     numericInput("reps", "Replications", 50, min = 1, max = 500, step = 10),
     numericInput("alpha", "Alpha", 0.05, min = 0.001, max = 0.25, step = 0.001),
@@ -209,7 +343,7 @@ ui <- page_sidebar(
     nav_panel(
       "Results",
       card(card_header("OLS demo summary"), tableOutput("summary")),
-      card(card_header("APA-style table"), verbatimTextOutput("apa"))
+      card(card_header("APA-style table"), uiOutput("apa_pretty"), tags$hr(), verbatimTextOutput("apa"))
     ),
     nav_panel(
       "Visualizations",
@@ -220,7 +354,17 @@ ui <- page_sidebar(
       )
     ),
     nav_panel("R Code", card(card_header("Generated R code"), verbatimTextOutput("code"))),
-    nav_panel("Quarto Export", card(card_header("Quarto export scaffold"), verbatimTextOutput("quarto_note")))
+    nav_panel(
+      "Quarto Export",
+      card(
+        card_header("Quarto export scaffold"),
+        selectInput("quarto_file", "Project file", choices = c("run.R", "index.qmd", "spec.yml", "results/model-equations.tex")),
+        downloadButton("download_quarto_file", "Download selected file"),
+        downloadButton("download_quarto_zip", "Download project zip"),
+        tags$hr(),
+        verbatimTextOutput("quarto_preview")
+      )
+    )
   )
 )
 
@@ -268,6 +412,11 @@ server <- function(input, output, session) {
     paste(markdown_table(summary_tbl()), collapse = "\n")
   })
 
+  output$apa_pretty <- renderUI({
+    req(summary_tbl())
+    apa_table_ui(summary_tbl())
+  })
+
   output$summary <- renderTable({
     req(summary_tbl())
     summary_tbl()
@@ -288,38 +437,36 @@ server <- function(input, output, session) {
   })
 
   output$code <- renderText({
-    sprintf(
-      paste(
-        "library(mcsimr)",
-        "",
-        "population_model <- %s",
-        "fitted_model <- %s",
-        "",
-        "spec <- sem_sim_spec(",
-        "  population_model = population_model,",
-        "  fitted_model = fitted_model,",
-        "  n = c(%s),",
-        "  reps = %s,",
-        "  estimator = 'ML',",
-        "  seed = %s",
-        ")",
-        "",
-        "study <- run_simulation_study(spec, workers = 4, checkpoint_dir = 'results/checkpoints')",
-        "summary <- study$summary",
-        "equations_latex <- study$equations_latex",
-        sep = "\n"
-      ),
-      deparse(input$population_model),
-      deparse(input$fitted_model),
-      paste(parse_numeric(input$n), collapse = ", "),
-      input$reps,
-      input$seed
-    )
+    quarto_files(input$population_model, input$fitted_model, input$n, input$reps, input$seed)[["run.R"]]
   })
 
-  output$quarto_note <- renderText({
-    "The full local app can export a runnable Quarto project with spec.yml, run.R, APA tables, figures, rendered model equations, and raw LaTeX equation files."
+  output$quarto_preview <- renderText({
+    quarto_files(input$population_model, input$fitted_model, input$n, input$reps, input$seed)[[input$quarto_file]]
   })
+
+  output$download_quarto_file <- downloadHandler(
+    filename = function() basename(input$quarto_file),
+    content = function(file) {
+      writeLines(quarto_files(input$population_model, input$fitted_model, input$n, input$reps, input$seed)[[input$quarto_file]], file)
+    }
+  )
+
+  output$download_quarto_zip <- downloadHandler(
+    filename = function() "mcsimr-quarto-project.zip",
+    content = function(file) {
+      tmp <- tempfile("mcsimr-quarto")
+      dir.create(tmp)
+      files <- quarto_files(input$population_model, input$fitted_model, input$n, input$reps, input$seed)
+      for (nm in names(files)) {
+        target <- file.path(tmp, nm)
+        dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
+        writeLines(files[[nm]], target)
+      }
+      old <- setwd(tmp)
+      on.exit(setwd(old), add = TRUE)
+      utils::zip(file, list.files(".", recursive = TRUE))
+    }
+  )
 }
 
 shinyApp(ui, server)

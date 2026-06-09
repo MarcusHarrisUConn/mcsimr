@@ -32,6 +32,146 @@ strip_numeric_multipliers <- function(x) {
   gsub("\\s+", " ", trimws(x))
 }
 
+app_css <- "
+:root {
+  --mc-red: #4A0101;
+  --mc-red-2: #7A0610;
+  --mc-accent: #C1121F;
+  --mc-accent-2: #F25C54;
+  --mc-bg: #FFF8F7;
+  --mc-panel: #FFFFFF;
+  --mc-text: #241516;
+  --mc-muted: #6E5558;
+  --mc-border: #E8C8C8;
+}
+body.mc-dark {
+  --mc-bg: #180405;
+  --mc-panel: #250708;
+  --mc-text: #FFF4F1;
+  --mc-muted: #E8B8B4;
+  --mc-border: #5C171B;
+}
+body {
+  background: var(--mc-bg);
+  color: var(--mc-text);
+}
+.bslib-sidebar-layout, .card, .tab-content {
+  background: transparent;
+}
+.card {
+  border-color: var(--mc-border);
+  background: var(--mc-panel);
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(74, 1, 1, 0.08);
+}
+.card-header {
+  background: linear-gradient(90deg, var(--mc-red), var(--mc-red-2));
+  color: #FFF4F1;
+  border-bottom: 0;
+  font-weight: 700;
+}
+.nav-tabs .nav-link.active {
+  color: #fff;
+  background: var(--mc-red);
+  border-color: var(--mc-red);
+}
+.nav-tabs .nav-link {
+  color: var(--mc-red-2);
+}
+body.mc-dark .nav-tabs .nav-link {
+  color: #FFD5D0;
+}
+.btn-primary, .btn-default.action-button {
+  background: var(--mc-accent);
+  border-color: var(--mc-accent);
+  color: #fff;
+}
+.btn-primary:hover, .btn-default.action-button:hover {
+  background: var(--mc-red-2);
+  border-color: var(--mc-red-2);
+}
+.form-control, .selectize-input, textarea {
+  background: var(--mc-panel) !important;
+  color: var(--mc-text) !important;
+  border-color: var(--mc-border) !important;
+}
+.help-block, .form-text, .text-muted {
+  color: var(--mc-muted) !important;
+}
+.apa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.92rem;
+}
+.apa-table caption {
+  caption-side: top;
+  text-align: left;
+  font-weight: 700;
+  color: var(--mc-text);
+  padding-bottom: .65rem;
+}
+.apa-table thead th {
+  border-top: 2px solid var(--mc-text);
+  border-bottom: 1px solid var(--mc-text);
+  font-weight: 700;
+}
+.apa-table tbody td {
+  border-bottom: 1px solid var(--mc-border);
+}
+.apa-table tbody tr:last-child td {
+  border-bottom: 2px solid var(--mc-text);
+}
+.apa-table th, .apa-table td {
+  padding: .45rem .55rem;
+  vertical-align: top;
+}
+.apa-note {
+  font-family: Georgia, 'Times New Roman', serif;
+  color: var(--mc-muted);
+  margin-top: .5rem;
+}
+.code-preview {
+  max-height: 520px;
+  overflow: auto;
+}
+"
+
+app_script <- "
+$(document).on('shiny:connected shiny:inputchanged', function() {
+  var dark = $('#theme_dark').is(':checked');
+  $('body').toggleClass('mc-dark', dark);
+});
+$(document).on('change', '#theme_dark', function() {
+  $('body').toggleClass('mc-dark', this.checked);
+});
+"
+
+apa_table_ui <- function(apa) {
+  tab <- apa$table
+  header <- tags$tr(lapply(names(tab), tags$th))
+  rows <- lapply(seq_len(nrow(tab)), function(i) {
+    tags$tr(lapply(tab[i, , drop = TRUE], tags$td))
+  })
+  tagList(
+    tags$table(
+      class = "apa-table",
+      tags$caption(strsplit(apa$caption, "\n", fixed = TRUE)[[1L]][1L]),
+      tags$thead(header),
+      tags$tbody(rows)
+    ),
+    tags$div(class = "apa-note", "Note. Values are rounded for display; downloadable files retain the generated summary output.")
+  )
+}
+
+exported_files <- function(path) {
+  if (is.null(path) || !dir.exists(path)) {
+    return(character())
+  }
+  files <- list.files(path, recursive = TRUE, all.files = TRUE, no.. = TRUE)
+  files[file.info(file.path(path, files))$isdir %in% FALSE]
+}
+
 build_sem_syntax <- function(factor_names,
                              indicator_text,
                              loading_text,
@@ -86,8 +226,10 @@ default_fitted <- "f =~ y1 + y2 + y3"
 
 ui <- page_sidebar(
   title = "mcsimr",
-  theme = bs_theme(version = 5, bootswatch = "flatly"),
+  theme = bs_theme(version = 5, bootswatch = "flatly", primary = "#7A0610"),
+  tags$head(tags$style(HTML(app_css)), tags$script(HTML(app_script))),
   sidebar = sidebar(
+    checkboxInput("theme_dark", "Dark mode", FALSE),
     selectInput("simulation_type", "Simulation family", choices = c("lavaan SEM" = "sem", "OLS regression" = "ols")),
     textInput("study_name", "Study name", "lavaan Monte Carlo Simulation"),
     textAreaInput("research_question", "Research question", "How does SEM parameter recovery vary across sample sizes?", rows = 3),
@@ -95,7 +237,9 @@ ui <- page_sidebar(
     numericInput("reps", "Replications per condition", 100, min = 1, step = 10),
     numericInput("alpha", "Alpha", 0.05, min = 0.001, max = 0.25, step = 0.001),
     numericInput("seed", "Seed", 20260608, min = 1, step = 1),
+    checkboxInput("use_parallel", "Use multiple cores", TRUE),
     numericInput("workers", "Workers", max(1, available_cores()), min = 1, step = 1),
+    helpText(textOutput("parallel_status", inline = TRUE)),
     textInput("checkpoint_dir", "Checkpoint directory", "output/checkpoints/sem_app"),
     actionButton("run", "Run simulation", class = "btn-primary")
   ),
@@ -151,6 +295,8 @@ ui <- page_sidebar(
         ),
         card(
           card_header("APA-style table"),
+          uiOutput("apa_pretty"),
+          tags$hr(),
           verbatimTextOutput("apa")
         )
       )
@@ -184,6 +330,15 @@ ui <- page_sidebar(
         textInput("export_path", "Quarto export path", "output/quarto/sem_simulation_project"),
         actionButton("export_quarto", "Export Quarto project"),
         verbatimTextOutput("export_status"),
+        selectInput("export_file", "Project file", choices = character()),
+        layout_columns(
+          col_widths = c(6, 6),
+          downloadButton("download_export_file", "Download selected file"),
+          downloadButton("download_export_zip", "Download project zip")
+        ),
+        tags$hr(),
+        verbatimTextOutput("export_file_preview"),
+        tags$hr(),
         downloadButton("download_summary", "Download summary")
       )
     )
@@ -193,16 +348,22 @@ ui <- page_sidebar(
 server <- function(input, output, session) {
   study <- reactiveVal(NULL)
   export_status <- reactiveVal("No project exported yet.")
+  exported_path <- reactiveVal(NULL)
 
-  observeEvent(input$simulation_type, {
-    model <- if (identical(input$simulation_type, "sem")) "sem" else "ols"
-    updateCheckboxGroupInput(
-      session,
-      "metrics",
-      choices = stats::setNames(metric_catalog(model)$metric, metric_catalog(model)$metric),
-      selected = default_metrics(model)
+  active_workers <- reactive({
+    if (isTRUE(input$use_parallel)) {
+      max(1L, as.integer(input$workers))
+    } else {
+      1L
+    }
+  })
+
+  output$parallel_status <- renderText({
+    paste0(
+      "Detected ", future::availableCores()[[1L]], " cores; this run will use ",
+      active_workers(), " worker", if (active_workers() == 1L) "." else "s."
     )
-  }, ignoreInit = FALSE)
+  })
 
   observeEvent(input$build_sem, {
     syntax <- build_sem_syntax(
@@ -253,7 +414,7 @@ server <- function(input, output, session) {
     withProgress(message = "Running simulation", value = 0, {
       out <- run_simulation_study(
         spec(),
-        workers = input$workers,
+        workers = active_workers(),
         checkpoint_dir = input$checkpoint_dir,
         resume = TRUE
       )
@@ -268,9 +429,11 @@ server <- function(input, output, session) {
       spec(),
       path = input$export_path,
       overwrite = TRUE,
-      workers = input$workers,
+      workers = active_workers(),
       checkpoint_dir = "results/checkpoints"
     )
+    exported_path(path)
+    updateSelectInput(session, "export_file", choices = exported_files(path))
     export_status(paste("Exported reproducible Quarto project to:", path))
   })
 
@@ -282,6 +445,11 @@ server <- function(input, output, session) {
   output$apa <- renderText({
     req(study())
     paste(study()$apa_tables$markdown, collapse = "\n")
+  })
+
+  output$apa_pretty <- renderUI({
+    req(study())
+    apa_table_ui(study()$apa_tables)
   })
 
   output$equations <- renderUI({
@@ -344,7 +512,7 @@ server <- function(input, output, session) {
         input$seed,
         deparse(input$study_name),
         deparse(input$research_question),
-        input$workers,
+        active_workers(),
         deparse(input$checkpoint_dir)
       ))
     }
@@ -387,7 +555,7 @@ server <- function(input, output, session) {
       deparse(input$fitted_formula),
       deparse(input$study_name),
       deparse(input$research_question),
-      input$workers,
+      active_workers(),
       deparse(input$checkpoint_dir)
     )
   })
@@ -400,6 +568,44 @@ server <- function(input, output, session) {
     filename = function() "mcsimr-summary.csv",
     content = function(file) {
       utils::write.csv(study()$summary, file, row.names = FALSE)
+    }
+  )
+
+  output$export_file_preview <- renderText({
+    path <- exported_path()
+    req(path, input$export_file)
+    file <- file.path(path, input$export_file)
+    if (!file.exists(file)) {
+      return("")
+    }
+    ext <- tolower(tools::file_ext(file))
+    if (!ext %in% c("r", "qmd", "yml", "yaml", "md", "tex", "txt", "csv")) {
+      return("Preview is available for text files only.")
+    }
+    paste(readLines(file, warn = FALSE, n = 250L), collapse = "\n")
+  })
+
+  output$download_export_file <- downloadHandler(
+    filename = function() {
+      req(input$export_file)
+      basename(input$export_file)
+    },
+    content = function(file) {
+      path <- exported_path()
+      req(path, input$export_file)
+      file.copy(file.path(path, input$export_file), file, overwrite = TRUE)
+    }
+  )
+
+  output$download_export_zip <- downloadHandler(
+    filename = function() "mcsimr-quarto-project.zip",
+    content = function(file) {
+      path <- exported_path()
+      req(path)
+      old <- setwd(path)
+      on.exit(setwd(old), add = TRUE)
+      files <- list.files(".", recursive = TRUE, all.files = TRUE, no.. = TRUE)
+      utils::zip(zipfile = file, files = files)
     }
   )
 }
