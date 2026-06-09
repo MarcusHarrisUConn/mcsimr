@@ -37,9 +37,30 @@ This checklist is adapted from the Monte Carlo Simulation Methods chapter by
 McNeish, Lane, and Curran in *The Reviewer's Guide to Quantitative Methods in
 the Social Sciences*.
 
-## First module: OLS regression
+## First target: lavaan SEM
 
-The first simulation type supports:
+The primary audience is lavaan users designing SEM simulation studies. The SEM
+simulation type supports:
+
+- lavaan population model syntax;
+- lavaan fitted model syntax;
+- sample size conditions;
+- estimator conditions;
+- number of replications;
+- alpha level;
+- reproducible RNG seed;
+- local parallel execution across cores;
+- checkpoint files per condition;
+- model equation conversion to LaTeX;
+- raw LaTeX export into Quarto;
+- summary metrics including MSE, bias, relative bias, RMSE, coverage, rejection
+  rate, power, Type I error, Monte Carlo standard error, convergence,
+  improper-solution rate, and fit-index summaries.
+
+## OLS regression module
+
+The OLS simulation type remains useful as a simpler model and as a special case
+of regression models that can also be represented in lavaan. It supports:
 
 - sample size conditions;
 - predictor correlation conditions;

@@ -71,6 +71,74 @@ validate_ols_spec <- function(spec) {
   invisible(spec)
 }
 
+sem_sim_spec <- function(population_model,
+                         fitted_model = population_model,
+                         n = c(100, 250, 500),
+                         reps = 1000,
+                         estimator = "ML",
+                         missing = "listwise",
+                         std_lv = TRUE,
+                         alpha = 0.05,
+                         seed = 20260608,
+                         metrics = default_metrics("sem"),
+                         study_name = "lavaan Monte Carlo Simulation",
+                         research_question = "How does SEM parameter recovery vary across sample sizes?") {
+  stopifnot(length(population_model) == 1L, nzchar(population_model))
+  stopifnot(length(fitted_model) == 1L, nzchar(fitted_model))
+  stopifnot(length(n) >= 1L, all(n > 1L))
+  stopifnot(reps >= 1L)
+  stopifnot(alpha > 0, alpha < 1)
+
+  spec <- list(
+    type = "sem",
+    study_name = study_name,
+    research_question = research_question,
+    population_model = population_model,
+    fitted_model = fitted_model,
+    n = as.integer(n),
+    reps = as.integer(reps),
+    estimator = as.character(estimator),
+    missing = as.character(missing),
+    std_lv = isTRUE(std_lv),
+    alpha = as.numeric(alpha),
+    seed = as.integer(seed),
+    metrics = as.character(metrics),
+    equations_latex = sem_model_latex(fitted_model),
+    created_at = as.character(Sys.time())
+  )
+
+  class(spec) <- c("mcsimr_sem_spec", "mcsimr_spec", "list")
+  spec
+}
+
+validate_sem_spec <- function(spec) {
+  if (!inherits(spec, "mcsimr_sem_spec") && !identical(spec$type, "sem")) {
+    stop("`spec` must be created by sem_sim_spec().", call. = FALSE)
+  }
+  invisible(spec)
+}
+
+sem_condition_grid <- function(spec) {
+  grid <- expand.grid(
+    n = spec$n,
+    estimator = spec$estimator,
+    KEEP.OUT.ATTRS = FALSE,
+    stringsAsFactors = FALSE
+  )
+  grid$condition_id <- seq_len(nrow(grid))
+  grid[c("condition_id", "n", "estimator")]
+}
+
+spec_equations <- function(spec) {
+  if (!is.null(spec$equations_latex)) {
+    return(spec$equations_latex)
+  }
+  if (identical(spec$type, "ols")) {
+    return(ols_formula_latex(spec$fitted_formula))
+  }
+  character()
+}
+
 metric_catalog <- function(model = c("ols", "sem")) {
   model <- match.arg(model)
   if (model == "ols") {
@@ -102,7 +170,7 @@ metric_catalog <- function(model = c("ols", "sem")) {
       "mean_estimate", "bias", "relative_bias", "mse", "rmse",
       "coverage", "rejection_rate", "power", "type_i_error",
       "mcse_rejection", "convergence_rate", "improper_solution_rate",
-      "fit_index_summary"
+      "mean_cfi", "mean_tli", "mean_rmsea", "mean_srmr"
     ),
     description = c(
       "Mean parameter estimate across replications.",
@@ -117,7 +185,10 @@ metric_catalog <- function(model = c("ols", "sem")) {
       "Monte Carlo standard error of the rejection rate.",
       "Proportion of replications that converged.",
       "Proportion of SEM replications with inadmissible estimates.",
-      "Condition-level summaries for fit indices such as CFI, TLI, RMSEA, and SRMR."
+      "Average comparative fit index.",
+      "Average Tucker-Lewis index.",
+      "Average RMSEA.",
+      "Average SRMR."
     ),
     stringsAsFactors = FALSE
   )
@@ -132,5 +203,10 @@ default_metrics <- function(model = c("ols", "sem")) {
       "mcse_rejection", "convergence_rate"
     ))
   }
-  metric_catalog("sem")$metric
+  c(
+    "mean_estimate", "bias", "relative_bias", "mse", "rmse",
+    "coverage", "rejection_rate", "power", "type_i_error",
+    "mcse_rejection", "convergence_rate", "improper_solution_rate",
+    "mean_cfi", "mean_tli", "mean_rmsea", "mean_srmr"
+  )
 }

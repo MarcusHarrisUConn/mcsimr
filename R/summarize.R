@@ -65,6 +65,7 @@ apa_metric_table <- function(summary,
                              digits = 3L,
                              caption = "Table 1\nMonte Carlo simulation performance metrics by condition and parameter.") {
   base_cols <- c("condition_id", "n", "predictor_correlation", "error_sd", "term", "true_value", "reps")
+  base_cols <- c(base_cols, "estimator")
   cols <- intersect(c(base_cols, metrics), names(summary))
   tab <- summary[, cols, drop = FALSE]
   labels <- c(
@@ -72,6 +73,7 @@ apa_metric_table <- function(summary,
     n = "N",
     predictor_correlation = "Predictor r",
     error_sd = "Residual SD",
+    estimator = "Estimator",
     term = "Parameter",
     true_value = "Population",
     reps = "Replications",
@@ -85,7 +87,12 @@ apa_metric_table <- function(summary,
     power = "Power",
     type_i_error = "Type I error",
     mcse_rejection = "MCSE",
-    convergence_rate = "Convergence"
+    convergence_rate = "Convergence",
+    improper_solution_rate = "Improper solution",
+    mean_cfi = "Mean CFI",
+    mean_tli = "Mean TLI",
+    mean_rmsea = "Mean RMSEA",
+    mean_srmr = "Mean SRMR"
   )
   names(tab) <- unname(labels[cols])
 
@@ -96,6 +103,64 @@ apa_metric_table <- function(summary,
   }
 
   list(caption = caption, table = tab, markdown = markdown_table(tab, caption))
+}
+
+summarize_sem_results <- function(results, metrics = default_metrics("sem")) {
+  parameter_rows <- !is.na(results$true_value)
+  x <- results[parameter_rows & results$converged, , drop = FALSE]
+  if (nrow(x) == 0L) {
+    stop("No converged SEM parameter-level results were available to summarize.", call. = FALSE)
+  }
+
+  split_key <- interaction(
+    x$condition_id, x$n, x$estimator, x$term,
+    drop = TRUE,
+    sep = "|"
+  )
+  groups <- split(x, split_key)
+
+  summaries <- lapply(groups, function(dat) {
+    true <- dat$true_value[1L]
+    estimate <- dat$estimate
+    rejection <- dat$p_value < dat$alpha[1L]
+    coverage <- dat$conf_low <= true & dat$conf_high >= true
+    reps <- length(estimate)
+    condition_rows <- results[results$condition_id == dat$condition_id[1L], , drop = FALSE]
+
+    data.frame(
+      condition_id = dat$condition_id[1L],
+      n = dat$n[1L],
+      estimator = dat$estimator[1L],
+      term = dat$term[1L],
+      true_value = true,
+      reps = reps,
+      convergence_rate = mean(condition_rows$converged, na.rm = TRUE),
+      improper_solution_rate = mean(unique(condition_rows[c("rep_id", "improper_solution")])$improper_solution, na.rm = TRUE),
+      mean_estimate = mean(estimate, na.rm = TRUE),
+      bias = mean(estimate - true, na.rm = TRUE),
+      relative_bias = if (isTRUE(all.equal(true, 0))) NA_real_ else mean((estimate - true) / true, na.rm = TRUE),
+      mse = mean((estimate - true)^2, na.rm = TRUE),
+      rmse = sqrt(mean((estimate - true)^2, na.rm = TRUE)),
+      coverage = mean(coverage, na.rm = TRUE),
+      rejection_rate = mean(rejection, na.rm = TRUE),
+      power = if (isTRUE(all.equal(true, 0))) NA_real_ else mean(rejection, na.rm = TRUE),
+      type_i_error = if (isTRUE(all.equal(true, 0))) mean(rejection, na.rm = TRUE) else NA_real_,
+      mcse_rejection = sqrt(mean(rejection, na.rm = TRUE) * (1 - mean(rejection, na.rm = TRUE)) / reps),
+      mean_cfi = mean(unique(condition_rows[c("rep_id", "cfi")])$cfi, na.rm = TRUE),
+      mean_tli = mean(unique(condition_rows[c("rep_id", "tli")])$tli, na.rm = TRUE),
+      mean_rmsea = mean(unique(condition_rows[c("rep_id", "rmsea")])$rmsea, na.rm = TRUE),
+      mean_srmr = mean(unique(condition_rows[c("rep_id", "srmr")])$srmr, na.rm = TRUE),
+      stringsAsFactors = FALSE
+    )
+  })
+
+  out <- do.call(rbind, summaries)
+  rownames(out) <- NULL
+  out <- out[order(out$condition_id, out$term), ]
+  keep <- unique(c(
+    "condition_id", "n", "estimator", "term", "true_value", "reps", metrics
+  ))
+  out[, intersect(keep, names(out)), drop = FALSE]
 }
 
 markdown_table <- function(tab, caption = NULL) {

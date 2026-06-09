@@ -27,6 +27,26 @@ spec$research_question
 source("run.R")
 ```
 
+## Model Equations
+
+```{r, results='asis'}
+if (length(equations_latex)) {
+  for (eq in equations_latex) {
+    cat("$$\n", eq, "\n$$\n\n", sep = "")
+  }
+}
+```
+
+### Raw LaTeX
+
+```{r, results='asis'}
+if (length(equations_latex)) {
+  cat("```tex\n")
+  cat(paste(equations_latex, collapse = "\n"))
+  cat("\n```\n")
+}
+```
+
 ## APA-Style Performance Table
 
 ```{r}

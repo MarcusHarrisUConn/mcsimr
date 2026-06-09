@@ -6,14 +6,15 @@
 <!-- badges: end -->
 
 `mcsimr` is a local-first R package and Shiny workbench for Monte Carlo
-simulation studies in the social and behavioral sciences.
+simulation studies in the social and behavioral sciences, with `lavaan`/SEM as
+the primary target audience.
 
-The project starts deliberately: ordinary least squares regression simulations
-with user-defined conditions, reproducible seeds, local parallel execution,
-checkpointed results, automatic simulation metrics, APA-style tables, figures,
-and exportable Quarto projects. The longer-term goal is a platform for larger
-simulation studies, including structural equation modeling workflows with
-`lavaan`.
+The project now starts from `lavaan`: users can define a population model,
+define a fitted model, set sample-size and estimator conditions, choose the
+number of replications and seed, run across local cores, and export APA-style
+tables, figures, model equations, raw LaTeX, and a reproducible Quarto project.
+OLS regression remains available as a special case and as a simpler first
+engine.
 
 ## Live demo
 
@@ -57,6 +58,47 @@ install.packages("remotes")
 remotes::install_github("MarcusHarrisUConn/mcsimr")
 ```
 
+## Run a lavaan simulation
+
+```r
+library(mcsimr)
+
+population_model <- "
+f =~ 0.70*y1 + 0.80*y2 + 0.90*y3
+f ~~ 1*f
+y1 ~~ 0.51*y1
+y2 ~~ 0.36*y2
+y3 ~~ 0.19*y3
+"
+
+fitted_model <- "
+f =~ y1 + y2 + y3
+"
+
+spec <- sem_sim_spec(
+  population_model = population_model,
+  fitted_model = fitted_model,
+  n = c(100, 250, 500),
+  reps = 1000,
+  estimator = c("ML"),
+  std_lv = TRUE,
+  alpha = 0.05,
+  seed = 20260608
+)
+
+study <- run_simulation_study(
+  spec,
+  workers = 4,
+  checkpoint_dir = "results/checkpoints/sem-demo",
+  resume = TRUE,
+  output_dir = "results/sem-demo"
+)
+
+study$summary
+cat(paste(study$equations_latex, collapse = "\n"))
+cat(paste(study$apa_tables$markdown, collapse = "\n"))
+```
+
 ## Run an OLS simulation
 
 ```r
@@ -86,7 +128,8 @@ study$summary
 cat(paste(study$apa_tables$markdown, collapse = "\n"))
 ```
 
-The summary includes parameter-level performance metrics:
+The summary includes automatically generated parameter-level performance
+metrics:
 
 - mean estimate;
 - bias;
@@ -98,6 +141,9 @@ The summary includes parameter-level performance metrics:
 - power for nonzero population effects;
 - Type I error for zero population effects;
 - Monte Carlo standard error for rejection rates.
+- convergence rate;
+- improper-solution rate for SEM;
+- fit summaries for SEM, including CFI, TLI, RMSEA, and SRMR.
 
 ## Launch the local desktop app
 
@@ -107,10 +153,12 @@ use_mcsimr_app()
 ```
 
 The local app is the right place for larger runs because it uses the package
-engine and can write checkpoints to disk. It exposes the first study-builder
-controls: model formula, condition values, seed, replications, workers, selected
-metrics, APA-style table output, and Quarto export. For simulations that may run
-for days or weeks, use checkpoint directories and rerun with `resume = TRUE`.
+engine and can write checkpoints to disk. It now defaults to a lavaan SEM
+builder with controls for population syntax, fitted syntax, sample-size
+conditions, estimator conditions, seed, replications, workers, selected metrics,
+APA-style table output, rendered equations, raw LaTeX, and Quarto export. For
+simulations that may run for days or weeks, use checkpoint directories and rerun
+with `resume = TRUE`.
 
 ## Export a reproducible Quarto project
 
@@ -131,7 +179,7 @@ The exported project contains:
 - `run.R`;
 - an `R/` helper folder;
 - a `results/` folder for raw results, metric summaries, APA-style table
-  markdown, and figures.
+  markdown, raw LaTeX model equations, and figures.
 
 The goal is that an app-launched simulation never stays trapped inside the app.
 It should become a transparent, rerunnable research artifact.
@@ -200,13 +248,17 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 
 ### Phase 3: SEM/lavaan simulations
 
-- [ ] SEM simulation specification
-- [ ] Population model syntax
-- [ ] Fitted model syntax
-- [ ] `lavaan` fit extraction
-- [ ] convergence and improper-solution summaries
-- [ ] parameter bias, coverage, power, and fit-index behavior
-- [ ] SEM Quarto report template
+- [x] SEM simulation specification
+- [x] Population model syntax
+- [x] Fitted model syntax
+- [x] `lavaan` fit extraction
+- [x] convergence and improper-solution summaries
+- [x] parameter bias, coverage, power, and fit-index behavior
+- [x] model equation LaTeX export
+- [x] SEM Quarto report template
+- [ ] missing-data conditions
+- [ ] model misspecification templates
+- [ ] multi-group SEM templates
 
 ### Phase 4: HPC-ready execution
 

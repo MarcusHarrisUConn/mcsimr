@@ -130,18 +130,30 @@ run_simulation_study <- function(spec,
                                  checkpoint_dir = NULL,
                                  resume = TRUE,
                                  output_dir = NULL) {
-  validate_ols_spec(spec)
-  raw <- run_ols_simulation(
-    spec = spec,
-    workers = workers,
-    checkpoint_dir = checkpoint_dir,
-    resume = resume
-  )
-  summary <- summarize_ols_results(raw, metrics = spec$metrics)
+  if (identical(spec$type, "sem") || inherits(spec, "mcsimr_sem_spec")) {
+    validate_sem_spec(spec)
+    raw <- run_sem_simulation(
+      spec = spec,
+      workers = workers,
+      checkpoint_dir = checkpoint_dir,
+      resume = resume
+    )
+    summary <- summarize_sem_results(raw, metrics = spec$metrics)
+  } else {
+    validate_ols_spec(spec)
+    raw <- run_ols_simulation(
+      spec = spec,
+      workers = workers,
+      checkpoint_dir = checkpoint_dir,
+      resume = resume
+    )
+    summary <- summarize_ols_results(raw, metrics = spec$metrics)
+  }
   apa <- apa_metric_table(summary, metrics = spec$metrics)
 
   bundle <- list(
     spec = spec,
+    equations_latex = spec_equations(spec),
     raw_results = raw,
     summary = summary,
     apa_tables = apa,

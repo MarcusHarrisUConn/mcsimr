@@ -7,12 +7,17 @@
 \alias{metric_catalog}
 \alias{ols_sim_spec}
 \alias{plot_metric}
+\alias{sem_model_latex}
+\alias{sem_sim_spec}
 \alias{run_condition}
 \alias{run_ols_simulation}
 \alias{run_replication}
+\alias{run_sem_simulation}
 \alias{run_simulation_study}
 \alias{save_metric_plots}
+\alias{spec_equations}
 \alias{summarize_ols_results}
+\alias{summarize_sem_results}
 \alias{use_mcsimr_app}
 \alias{write_apa_tables}
 \title{Local Monte Carlo simulation workbench}
@@ -35,16 +40,31 @@ ols_sim_spec(n = c(100, 250, 500), reps = 1000,
   metrics = default_metrics("ols"), study_name = "OLS Monte Carlo Simulation",
   research_question = "How does OLS coefficient recovery vary across sample sizes?")
 
+sem_sim_spec(population_model, fitted_model = population_model,
+  n = c(100, 250, 500), reps = 1000, estimator = "ML",
+  missing = "listwise", std_lv = TRUE, alpha = 0.05,
+  seed = 20260608, metrics = default_metrics("sem"),
+  study_name = "lavaan Monte Carlo Simulation",
+  research_question = "How does SEM parameter recovery vary across sample sizes?")
+
+sem_model_latex(model)
+
+spec_equations(spec)
+
 run_replication(spec, n, rep_id, condition_id = 1L)
 
 run_condition(spec, condition, workers = 1L)
 
 run_ols_simulation(spec, workers = 1L, checkpoint_dir = NULL, resume = TRUE)
 
+run_sem_simulation(spec, workers = 1L, checkpoint_dir = NULL, resume = TRUE)
+
 run_simulation_study(spec, workers = 1L, checkpoint_dir = NULL,
   resume = TRUE, output_dir = NULL)
 
 summarize_ols_results(results, metrics = default_metrics("ols"))
+
+summarize_sem_results(results, metrics = default_metrics("sem"))
 
 apa_metric_table(summary, metrics = default_metrics("ols"), digits = 3L,
   caption = "Table 1\\nMonte Carlo simulation performance metrics by condition and parameter.")
@@ -76,7 +96,12 @@ use_mcsimr_app(...)
 \item{metrics}{Metrics to include in summaries and APA-style tables.}
 \item{study_name}{Human-readable study name.}
 \item{research_question}{Human-readable motivating question.}
-\item{model}{Simulation model family.}
+\item{population_model}{lavaan syntax used to generate simulated data.}
+\item{fitted_model}{lavaan syntax fitted to each simulated data set.}
+\item{estimator}{lavaan estimator condition or conditions.}
+\item{missing}{lavaan missing-data handling option.}
+\item{std_lv}{Whether lavaan should identify latent variables with \code{std.lv = TRUE}.}
+\item{model}{lavaan model syntax for equation conversion, or simulation model family for \code{metric_catalog()}.}
 \item{spec}{Simulation specification created by \code{ols_sim_spec()}.}
 \item{rep_id}{Replication identifier.}
 \item{condition_id}{Condition identifier.}

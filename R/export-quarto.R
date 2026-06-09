@@ -25,7 +25,11 @@ export_quarto_project <- function(spec,
     "library(mcsimr)",
     "",
     "spec <- yaml::read_yaml('spec.yml')",
-    "class(spec) <- c('mcsimr_ols_spec', 'mcsimr_spec', 'list')",
+    "if (identical(spec$type, 'sem')) {",
+    "  class(spec) <- c('mcsimr_sem_spec', 'mcsimr_spec', 'list')",
+    "} else {",
+    "  class(spec) <- c('mcsimr_ols_spec', 'mcsimr_spec', 'list')",
+    "}",
     "dir.create('results', showWarnings = FALSE)",
     sprintf(
       "study <- run_simulation_study(spec, workers = %d, checkpoint_dir = '%s', output_dir = 'results')",
@@ -35,6 +39,8 @@ export_quarto_project <- function(spec,
     "results <- study$raw_results",
     "summary <- study$summary",
     "apa_table <- study$apa_tables",
+    "equations_latex <- study$equations_latex",
+    "writeLines(equations_latex, 'results/model-equations.tex')",
     "writeLines(apa_table$markdown, 'results/apa-table.md')"
   ), file.path(path, "run.R"))
 
