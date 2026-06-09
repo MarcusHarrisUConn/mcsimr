@@ -40,16 +40,20 @@ app_css <- "
   --mc-accent-2: #F25C54;
   --mc-bg: #FFF8F7;
   --mc-panel: #FFFFFF;
+  --mc-input: #FFFFFF;
   --mc-text: #241516;
   --mc-muted: #6E5558;
   --mc-border: #E8C8C8;
+  --mc-focus: rgba(193, 18, 31, 0.26);
 }
 body.mc-dark {
   --mc-bg: #180405;
-  --mc-panel: #250708;
-  --mc-text: #FFF4F1;
-  --mc-muted: #E8B8B4;
-  --mc-border: #5C171B;
+  --mc-panel: #2B090B;
+  --mc-input: #360D10;
+  --mc-text: #FFF7F4;
+  --mc-muted: #F0C9C4;
+  --mc-border: #7E2B31;
+  --mc-focus: rgba(242, 92, 84, 0.34);
 }
 body {
   background: var(--mc-bg);
@@ -81,6 +85,14 @@ body {
 body.mc-dark .nav-tabs .nav-link {
   color: #FFD5D0;
 }
+label, .control-label, .form-label, .shiny-input-container > label,
+.checkbox label, .radio label, .form-check-label {
+  color: var(--mc-text);
+  font-weight: 650;
+}
+.shiny-input-container {
+  color: var(--mc-text);
+}
 .btn-primary, .btn-default.action-button {
   background: var(--mc-accent);
   border-color: var(--mc-accent);
@@ -90,13 +102,95 @@ body.mc-dark .nav-tabs .nav-link {
   background: var(--mc-red-2);
   border-color: var(--mc-red-2);
 }
-.form-control, .selectize-input, textarea {
-  background: var(--mc-panel) !important;
+.form-control, .selectize-input, .selectize-control.single .selectize-input,
+.selectize-control.multi .selectize-input, textarea {
+  background: var(--mc-input) !important;
+  color: var(--mc-text) !important;
+  border-color: var(--mc-border) !important;
+  box-shadow: none !important;
+}
+.form-control:focus, .selectize-input.focus, textarea:focus {
+  border-color: var(--mc-accent-2) !important;
+  box-shadow: 0 0 0 .22rem var(--mc-focus) !important;
+}
+.selectize-dropdown, .selectize-dropdown-content {
+  background: var(--mc-input) !important;
   color: var(--mc-text) !important;
   border-color: var(--mc-border) !important;
 }
+.selectize-dropdown .option {
+  color: var(--mc-text) !important;
+}
+.selectize-dropdown .active {
+  background: rgba(193, 18, 31, 0.18) !important;
+  color: var(--mc-text) !important;
+}
 .help-block, .form-text, .text-muted {
   color: var(--mc-muted) !important;
+}
+.theme-switch {
+  margin-bottom: 1rem;
+}
+.theme-switch .shiny-input-container {
+  width: 100%;
+  margin-bottom: 0;
+}
+.theme-switch .checkbox {
+  margin: 0;
+}
+.theme-switch label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .85rem;
+  width: 100%;
+  padding: .7rem .8rem;
+  border: 1px solid var(--mc-border);
+  border-radius: 999px;
+  background: var(--mc-panel);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 8px 18px rgba(74, 1, 1, .08);
+  cursor: pointer;
+}
+.theme-switch input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  order: 2;
+  width: 3.2rem;
+  height: 1.7rem;
+  margin: 0;
+  border-radius: 999px;
+  border: 1px solid var(--mc-border);
+  background: #EBD5D5;
+  position: relative;
+  transition: background .18s ease, border-color .18s ease;
+  flex: 0 0 auto;
+}
+.theme-switch input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  width: 1.25rem;
+  height: 1.25rem;
+  top: .16rem;
+  left: .18rem;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(36, 21, 22, .28);
+  transition: transform .18s ease;
+}
+.theme-switch input[type='checkbox']:checked {
+  background: linear-gradient(135deg, var(--mc-red), var(--mc-accent));
+  border-color: var(--mc-accent-2);
+}
+.theme-switch input[type='checkbox']:checked::after {
+  transform: translateX(1.45rem);
+}
+.theme-switch input[type='checkbox']:focus-visible {
+  outline: 3px solid var(--mc-focus);
+  outline-offset: 2px;
+}
+.theme-switch span {
+  color: var(--mc-text);
+  font-weight: 750;
 }
 .apa-table {
   width: 100%;
@@ -229,7 +323,7 @@ ui <- page_sidebar(
   theme = bs_theme(version = 5, bootswatch = "flatly", primary = "#7A0610"),
   tags$head(tags$style(HTML(app_css)), tags$script(HTML(app_script))),
   sidebar = sidebar(
-    checkboxInput("theme_dark", "Dark mode", FALSE),
+    tags$div(class = "theme-switch", checkboxInput("theme_dark", "Dark mode", FALSE)),
     selectInput("simulation_type", "Simulation family", choices = c("lavaan SEM" = "sem", "OLS regression" = "ols")),
     textInput("study_name", "Study name", "lavaan Monte Carlo Simulation"),
     textAreaInput("research_question", "Research question", "How does SEM parameter recovery vary across sample sizes?", rows = 3),
