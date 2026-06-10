@@ -208,6 +208,8 @@ It should become a transparent, rerunnable research artifact.
 ## `targets` workflow
 
 A starter pipeline lives in [`examples/ols-targets/_targets.R`](examples/ols-targets/_targets.R).
+An SEM pipeline starter lives in [`examples/sem-targets/_targets.R`](examples/sem-targets/_targets.R),
+and a SLURM template lives in [`examples/hpc/slurm-mcsimr.sh`](examples/hpc/slurm-mcsimr.sh).
 
 ```r
 install.packages("targets")
@@ -264,11 +266,13 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 - [ ] Batch-size controls for very large replication counts
 - [x] Generic lavaan parameter condition grid
 - [x] Bollen Political Democracy example preset
-- [ ] Visual condition editor with saved presets
+- [x] First visual condition editor for SEM parameter conditions
+- [ ] Saved condition presets
 - [ ] More APA table layouts for parameter-level and condition-level summaries
 - [x] Initial R package tests
 - [x] Public package overview page
-- [ ] Full pkgdown reference site
+- [x] Initial pkgdown article scaffold
+- [ ] Full pkgdown reference site deployment
 
 ### Phase 3: SEM/lavaan simulations
 
@@ -289,7 +293,8 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 ### Phase 4: HPC-ready execution
 
 - [ ] `targets` plus scheduler examples
-- [ ] SLURM template
+- [x] SEM `targets` example
+- [x] SLURM template
 - [ ] condition sharding
 - [ ] checkpoint validation
 - [ ] reproducible environment lockfiles

@@ -1,0 +1,57 @@
+---
+title: "Getting Started with mcsimr"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with mcsimr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+`mcsimr` is a local-first R package and Shiny workbench for Monte Carlo
+simulation studies. The package is designed so simulation decisions can be
+made in a graphical interface, exported as R code, and rerun as a reproducible
+Quarto project.
+
+## Launch the app
+
+```{r, eval = FALSE}
+library(mcsimr)
+use_mcsimr_app()
+```
+
+## Run a small OLS simulation
+
+```{r, eval = FALSE}
+spec <- ols_sim_spec(
+  n = c(100, 250),
+  reps = 100,
+  betas = c(0.20, 0.30, 0.00),
+  predictor_correlation = c(0.00, 0.30),
+  error_sd = 1,
+  seed = 20260608
+)
+
+study <- run_simulation_study(
+  spec,
+  workers = 2,
+  checkpoint_dir = "results/checkpoints/ols-demo",
+  resume = TRUE
+)
+
+study$summary
+```
+
+## Export a Quarto project
+
+```{r, eval = FALSE}
+export_quarto_project(
+  spec,
+  path = "mcsimr-report",
+  workers = 2,
+  checkpoint_dir = "results/checkpoints"
+)
+```

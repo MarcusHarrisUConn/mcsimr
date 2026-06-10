@@ -21,7 +21,6 @@ This is a development version and has not yet been submitted to CRAN.
 
 Known pre-submission items:
 
-- Replace the placeholder maintainer email in `DESCRIPTION` with the final CRAN maintainer email.
 - Confirm all examples run quickly enough for CRAN.
 - Add unit tests for SEM parameter conditions, checkpoint resume behavior, and Quarto export.
 - Run checks on Windows, macOS, and Linux.

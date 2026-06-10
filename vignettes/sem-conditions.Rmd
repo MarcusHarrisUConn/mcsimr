@@ -1,0 +1,75 @@
+---
+title: "SEM Parameter Conditions"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{SEM Parameter Conditions}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+For `lavaan` simulations, `mcsimr` lets users vary population parameters across
+conditions. This is useful when a Monte Carlo study asks how performance changes
+as loadings, factor variances, structural paths, residual variances, or residual
+covariances change.
+
+## Define parameters to vary
+
+Use `sem_parameter_conditions()` with lavaan's usual parameter language:
+
+```{r, eval = FALSE}
+pc <- sem_parameter_conditions(
+  lhs = c("f", "f", "y1"),
+  op = c("=~", "~~", "~~"),
+  rhs = c("y2", "f", "y1"),
+  values = list(
+    c(0.60, 0.80),
+    c(0.80, 1.00),
+    c(0.40, 0.60)
+  )
+)
+```
+
+The function crosses the supplied values, so the example above creates a full
+condition grid across the loading, factor variance, and residual variance.
+
+## Build the simulation specification
+
+```{r, eval = FALSE}
+population_model <- "
+f =~ 0.70*y1 + 0.80*y2 + 0.90*y3
+f ~~ 1*f
+y1 ~~ 0.51*y1
+y2 ~~ 0.36*y2
+y3 ~~ 0.19*y3
+"
+
+spec <- sem_sim_spec(
+  population_model = population_model,
+  fitted_model = "f =~ y1 + y2 + y3",
+  n = c(100, 250, 500),
+  reps = 1000,
+  parameter_conditions = pc,
+  seed = 20260608
+)
+
+sem_condition_grid(spec)
+```
+
+## Run with checkpoints
+
+```{r, eval = FALSE}
+study <- run_simulation_study(
+  spec,
+  workers = available_cores(),
+  checkpoint_dir = "results/checkpoints/sem-demo",
+  resume = TRUE,
+  output_dir = "results/sem-demo"
+)
+```
+
+The summary includes the parameter-condition label so APA-style tables and plots
+can be interpreted by condition, not only by numeric condition id.

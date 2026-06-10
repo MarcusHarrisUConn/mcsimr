@@ -123,6 +123,8 @@ body.mc-dark code, body.mc-dark pre { color: #FFE7E2 !important; }
   color: var(--mc-text);
   border-bottom-color: var(--mc-border);
 }
+mjx-container, mjx-container * { color: var(--mc-text) !important; }
+body.mc-dark mjx-container, body.mc-dark mjx-container * { color: #FFE7E2 !important; }
 "
 
 app_script <- "

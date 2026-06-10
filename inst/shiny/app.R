@@ -63,6 +63,10 @@ parse_parameter_condition_lines <- function(x) {
   )
 }
 
+format_parameter_condition_line <- function(lhs, op, rhs, values) {
+  paste0(trimws(lhs), " ", trimws(op), " ", trimws(rhs), ": ", paste(values, collapse = ", "))
+}
+
 strip_numeric_multipliers <- function(x) {
   x <- gsub("(^|[+~])\\s*-?[0-9.]+\\s*\\*", "\\1 ", x)
   gsub("\\s+", " ", trimws(x))
@@ -289,6 +293,12 @@ body.mc-dark code, body.mc-dark pre {
   max-height: 260px;
   overflow: auto;
 }
+mjx-container, mjx-container * {
+  color: var(--mc-text) !important;
+}
+body.mc-dark mjx-container, body.mc-dark mjx-container * {
+  color: #FFE7E2 !important;
+}
 "
 
 app_script <- "
@@ -452,7 +462,18 @@ ui <- page_sidebar(
             textAreaInput("structural_paths", "Structural regressions", "", rows = 3),
             checkboxInput("include_residuals", "Compute residual variances from standardized loadings", TRUE),
             actionButton("build_sem", "Build lavaan syntax"),
-            actionButton("load_bollen", "Load Political Democracy example")
+            actionButton("load_bollen", "Load Political Democracy example"),
+            tags$hr(),
+            textInput("condition_lhs", "Condition lhs", "f"),
+            selectInput("condition_op", "Condition operator", choices = c("Loading (=~)" = "=~", "Regression (~)" = "~", "Variance/covariance (~~)" = "~~", "Intercept (~1)" = "~1")),
+            textInput("condition_rhs", "Condition rhs", "y2"),
+            textInput("condition_values", "Condition values", "0.60, 0.80"),
+            layout_columns(
+              col_widths = c(6, 6),
+              actionButton("add_condition", "Add condition"),
+              actionButton("clear_conditions", "Clear conditions")
+            ),
+            tableOutput("visual_conditions")
           ),
           conditionalPanel(
             "input.simulation_type == 'ols'",
@@ -545,6 +566,13 @@ server <- function(input, output, session) {
   study <- reactiveVal(NULL)
   export_status <- reactiveVal("No project exported yet.")
   exported_path <- reactiveVal(NULL)
+  visual_conditions <- reactiveVal(data.frame(
+    lhs = character(),
+    op = character(),
+    rhs = character(),
+    values = character(),
+    stringsAsFactors = FALSE
+  ))
 
   active_workers <- reactive({
     if (isTRUE(input$use_parallel)) {
@@ -583,7 +611,41 @@ server <- function(input, output, session) {
     updateTextAreaInput(session, "loading_map", value = "ind60: 1, 2.180, 1.819\ndem60: 1, 1.257, 1.058, 1.265\ndem65: 1, 1.186, 1.280, 1.266")
     updateTextAreaInput(session, "factor_covariances", value = "y1 ~~ 1.892*y5\ny2 ~~ 7.373*y4\ny2 ~~ 2.488*y6\ny3 ~~ 5.067*y7\ny4 ~~ 1.706*y8")
     updateTextAreaInput(session, "structural_paths", value = "dem60 ~ 1.483*ind60\ndem65 ~ 0.572*ind60 + 0.837*dem60")
+    visual_conditions(data.frame(
+      lhs = c("dem65", "ind60", "dem60"),
+      op = c("~", "=~", "~~"),
+      rhs = c("dem60", "x2", "dem60"),
+      values = c("0.65, 0.85", "1.80, 2.20", "3.00, 4.00"),
+      stringsAsFactors = FALSE
+    ))
   })
+
+  observeEvent(input$add_condition, {
+    vals <- parse_numeric(input$condition_values)
+    line <- format_parameter_condition_line(input$condition_lhs, input$condition_op, input$condition_rhs, vals)
+    current <- trimws(input$parameter_conditions)
+    updated <- if (nzchar(current)) paste(current, line, sep = "\n") else line
+    updateTextAreaInput(session, "parameter_conditions", value = updated)
+    visual_conditions(rbind(
+      visual_conditions(),
+      data.frame(
+        lhs = input$condition_lhs,
+        op = input$condition_op,
+        rhs = input$condition_rhs,
+        values = paste(vals, collapse = ", "),
+        stringsAsFactors = FALSE
+      )
+    ))
+  })
+
+  observeEvent(input$clear_conditions, {
+    updateTextAreaInput(session, "parameter_conditions", value = "")
+    visual_conditions(visual_conditions()[0, , drop = FALSE])
+  })
+
+  output$visual_conditions <- renderTable({
+    visual_conditions()
+  }, striped = TRUE, bordered = TRUE)
 
   parameter_conditions <- reactive({
     if (!identical(input$simulation_type, "sem")) {
