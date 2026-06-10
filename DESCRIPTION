@@ -2,17 +2,20 @@ Package: mcsimr
 Title: Local Monte Carlo Simulation Workbench
 Version: 0.0.0.9000
 Authors@R: c(
-    person("M.", "H.", email = "maintainer@example.com", role = c("aut", "cre"))
+    person("Marcus", "Harris", email = "maintainer@example.com", role = c("aut", "cre"))
     )
-Author: M. H.
-Maintainer: M. H. <maintainer@example.com>
+Author: Marcus Harris
+Maintainer: Marcus Harris <maintainer@example.com>
 Description: A local-first R package and Shiny app foundation for designing,
     running, checkpointing, summarizing, and exporting reproducible Monte Carlo
-    simulation studies. The initial engine targets ordinary least squares
-    regression, with the architecture intended to expand to SEM simulations
-    through lavaan.
+    simulation studies. The engine supports ordinary least squares regression
+    and structural equation model simulations through lavaan, including
+    condition grids for sample sizes, estimators, and population parameters.
 License: MIT + file LICENSE
+URL: http://marcusharrisphd.com/mcsimr/, https://github.com/MarcusHarrisUConn/mcsimr
+BugReports: https://github.com/MarcusHarrisUConn/mcsimr/issues
 Encoding: UTF-8
+Language: en-US
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Depends:
@@ -29,6 +32,8 @@ Imports:
 Suggests:
     shiny,
     bslib,
+    knitr,
+    rmarkdown,
     targets,
     tarchetypes,
     quarto,

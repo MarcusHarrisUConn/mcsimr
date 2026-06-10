@@ -15,6 +15,8 @@
 \alias{run_sem_simulation}
 \alias{run_simulation_study}
 \alias{save_metric_plots}
+\alias{sem_condition_grid}
+\alias{sem_parameter_conditions}
 \alias{spec_equations}
 \alias{summarize_ols_results}
 \alias{summarize_sem_results}
@@ -42,10 +44,15 @@ ols_sim_spec(n = c(100, 250, 500), reps = 1000,
 
 sem_sim_spec(population_model, fitted_model = population_model,
   n = c(100, 250, 500), reps = 1000, estimator = "ML",
-  missing = "listwise", std_lv = TRUE, alpha = 0.05,
-  seed = 20260608, metrics = default_metrics("sem"),
+  parameter_conditions = NULL, missing = "listwise", std_lv = TRUE,
+  alpha = 0.05, seed = 20260608, metrics = default_metrics("sem"),
   study_name = "lavaan Monte Carlo Simulation",
   research_question = "How does SEM parameter recovery vary across sample sizes?")
+
+sem_parameter_conditions(lhs = character(), op = character(),
+  rhs = character(), values = list(), label = NULL)
+
+sem_condition_grid(spec)
 
 sem_model_latex(model)
 
@@ -99,6 +106,12 @@ use_mcsimr_app(...)
 \item{population_model}{lavaan syntax used to generate simulated data.}
 \item{fitted_model}{lavaan syntax fitted to each simulated data set.}
 \item{estimator}{lavaan estimator condition or conditions.}
+\item{parameter_conditions}{Optional lavaan parameter values to vary across SEM simulation conditions.}
+\item{lhs}{Left-hand side parameter names for lavaan parameter conditions.}
+\item{op}{lavaan operator for each parameter condition, such as \code{=~}, \code{~}, or \code{~~}.}
+\item{rhs}{Right-hand side parameter names for lavaan parameter conditions.}
+\item{values}{List of numeric values to cross across simulation conditions.}
+\item{label}{Optional display labels for parameter conditions.}
 \item{missing}{lavaan missing-data handling option.}
 \item{std_lv}{Whether lavaan should identify latent variables with \code{std.lv = TRUE}.}
 \item{model}{lavaan model syntax for equation conversion, or simulation model family for \code{metric_catalog()}.}

@@ -3,7 +3,11 @@ export_quarto_project <- function(spec,
                                   overwrite = FALSE,
                                   workers = 1L,
                                   checkpoint_dir = "results/checkpoints") {
-  validate_ols_spec(spec)
+  if (identical(spec$type, "sem") || inherits(spec, "mcsimr_sem_spec")) {
+    validate_sem_spec(spec)
+  } else {
+    validate_ols_spec(spec)
+  }
   if (dir.exists(path) && !overwrite) {
     stop("Export path already exists. Use overwrite = TRUE to replace template files.", call. = FALSE)
   }
@@ -21,15 +25,11 @@ export_quarto_project <- function(spec,
   }
 
   yaml::write_yaml(unclass(spec), file.path(path, "spec.yml"))
+  saveRDS(spec, file.path(path, "spec.rds"))
   writeLines(c(
     "library(mcsimr)",
     "",
-    "spec <- yaml::read_yaml('spec.yml')",
-    "if (identical(spec$type, 'sem')) {",
-    "  class(spec) <- c('mcsimr_sem_spec', 'mcsimr_spec', 'list')",
-    "} else {",
-    "  class(spec) <- c('mcsimr_ols_spec', 'mcsimr_spec', 'list')",
-    "}",
+    "spec <- readRDS('spec.rds')",
     "dir.create('results', showWarnings = FALSE)",
     sprintf(
       "study <- run_simulation_study(spec, workers = %d, checkpoint_dir = '%s', output_dir = 'results')",

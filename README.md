@@ -22,6 +22,10 @@ After GitHub Pages finishes deploying, the browser demo will be available at:
 
 <http://marcusharrisphd.com/mcsimr/>
 
+Package overview page:
+
+<http://marcusharrisphd.com/mcsimr/package.html>
+
 The live demo is powered by Shinylive, so it runs entirely in the browser. It is
 meant for small demonstrations and teaching examples. Large simulations should
 run locally or on an HPC system using the package engine, checkpoints, and
@@ -75,12 +79,20 @@ fitted_model <- "
 f =~ y1 + y2 + y3
 "
 
+parameter_conditions <- sem_parameter_conditions(
+  lhs = c("f", "f"),
+  op = c("=~", "~~"),
+  rhs = c("y2", "f"),
+  values = list(c(0.60, 0.80), c(0.80, 1.00))
+)
+
 spec <- sem_sim_spec(
   population_model = population_model,
   fitted_model = fitted_model,
   n = c(100, 250, 500),
   reps = 1000,
   estimator = c("ML"),
+  parameter_conditions = parameter_conditions,
   std_lv = TRUE,
   alpha = 0.05,
   seed = 20260608
@@ -156,7 +168,9 @@ The local app is the right place for larger runs because it uses the package
 engine and can write checkpoints to disk. It now uses a tabbed workflow:
 
 - **Model Builder**: build lavaan SEM syntax from latent variables, indicators,
-  loadings, covariances, and structural paths, or edit raw lavaan syntax.
+  loadings, covariances, and structural paths, or edit raw lavaan syntax. SEM
+  users can vary lavaan population parameters across conditions using parameter
+  rows such as `f =~ y2: 0.60, 0.80` or `dem65 ~ dem60: 0.65, 0.85`.
 - **Results**: inspect simulation summaries and APA-style tables.
 - **Visualizations**: plot metrics such as bias, RMSE, coverage, power, Type I
   error, and SEM fit indices.
@@ -248,10 +262,13 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 - [ ] Progress logs and run registry
 - [ ] Safer resume/restart controls
 - [ ] Batch-size controls for very large replication counts
-- [ ] Condition editor with saved presets
+- [x] Generic lavaan parameter condition grid
+- [x] Bollen Political Democracy example preset
+- [ ] Visual condition editor with saved presets
 - [ ] More APA table layouts for parameter-level and condition-level summaries
-- [ ] R package tests
-- [ ] pkgdown documentation site
+- [x] Initial R package tests
+- [x] Public package overview page
+- [ ] Full pkgdown reference site
 
 ### Phase 3: SEM/lavaan simulations
 
@@ -263,6 +280,8 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 - [x] parameter bias, coverage, power, and fit-index behavior
 - [x] model equation LaTeX export
 - [x] SEM Quarto report template
+- [x] loadings, factor variances, regressions, covariances, and residuals as
+  condition factors through lavaan parameter conditions
 - [ ] missing-data conditions
 - [ ] model misspecification templates
 - [ ] multi-group SEM templates

@@ -39,6 +39,11 @@ jobs:
         run: |
           shinylive::export("app", "site")
 
+      - name: Add package page
+        shell: bash
+        run: |
+          cp docs/site/package.html site/package.html
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 

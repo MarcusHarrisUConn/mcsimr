@@ -27,6 +27,42 @@ parse_named_lines <- function(x) {
   out
 }
 
+parse_parameter_condition_lines <- function(x) {
+  lines <- trimws(unlist(strsplit(x, "\n", fixed = TRUE)))
+  lines <- lines[nzchar(lines)]
+  if (!length(lines)) {
+    return(NULL)
+  }
+  parsed <- lapply(lines, function(line) {
+    pieces <- strsplit(line, ":", fixed = TRUE)[[1L]]
+    if (length(pieces) < 2L) {
+      stop("Condition lines must look like `lhs op rhs: value1, value2`.", call. = FALSE)
+    }
+    term <- trimws(pieces[1L])
+    values <- as.numeric(trimws(strsplit(paste(pieces[-1L], collapse = ":"), ",", fixed = TRUE)[[1L]]))
+    if (any(is.na(values))) {
+      stop("Condition values must be numeric: ", line, call. = FALSE)
+    }
+    op <- c("=~", "~~", "~1", "~")[vapply(c("=~", "~~", "~1", "~"), function(o) grepl(o, term, fixed = TRUE), logical(1L))]
+    if (!length(op)) {
+      stop("Could not find a lavaan operator in: ", line, call. = FALSE)
+    }
+    op <- op[[1L]]
+    parts <- trimws(strsplit(term, op, fixed = TRUE)[[1L]])
+    if (length(parts) != 2L) {
+      stop("Could not parse parameter condition: ", line, call. = FALSE)
+    }
+    list(lhs = parts[[1L]], op = op, rhs = parts[[2L]], values = values, label = paste(parts[[1L]], op, parts[[2L]]))
+  })
+  sem_parameter_conditions(
+    lhs = vapply(parsed, `[[`, character(1L), "lhs"),
+    op = vapply(parsed, `[[`, character(1L), "op"),
+    rhs = vapply(parsed, `[[`, character(1L), "rhs"),
+    values = lapply(parsed, `[[`, "values"),
+    label = vapply(parsed, `[[`, character(1L), "label")
+  )
+}
+
 strip_numeric_multipliers <- function(x) {
   x <- gsub("(^|[+~])\\s*-?[0-9.]+\\s*\\*", "\\1 ", x)
   gsub("\\s+", " ", trimws(x))
@@ -197,6 +233,8 @@ label, .control-label, .form-label, .shiny-input-container > label,
   border-collapse: collapse;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 0.92rem;
+  background: var(--mc-panel);
+  color: var(--mc-text);
 }
 .apa-table caption {
   caption-side: top;
@@ -212,6 +250,7 @@ label, .control-label, .form-label, .shiny-input-container > label,
 }
 .apa-table tbody td {
   border-bottom: 1px solid var(--mc-border);
+  color: var(--mc-text);
 }
 .apa-table tbody tr:last-child td {
   border-bottom: 2px solid var(--mc-text);
@@ -227,6 +266,27 @@ label, .control-label, .form-label, .shiny-input-container > label,
 }
 .code-preview {
   max-height: 520px;
+  overflow: auto;
+}
+pre, .shiny-text-output, .shiny-bound-output pre {
+  background: var(--mc-input) !important;
+  color: var(--mc-text) !important;
+  border: 1px solid var(--mc-border) !important;
+  border-radius: 8px;
+}
+body.mc-dark code, body.mc-dark pre {
+  color: #FFE7E2 !important;
+}
+.table, table {
+  color: var(--mc-text);
+}
+.table > :not(caption) > * > * {
+  background-color: var(--mc-panel);
+  color: var(--mc-text);
+  border-bottom-color: var(--mc-border);
+}
+.condition-preview {
+  max-height: 260px;
   overflow: auto;
 }
 "
@@ -317,6 +377,45 @@ build_sem_syntax <- function(factor_names,
 
 default_population <- "f =~ 0.70*y1 + 0.80*y2 + 0.90*y3\nf ~~ 1*f\ny1 ~~ 0.51*y1\ny2 ~~ 0.36*y2\ny3 ~~ 0.19*y3"
 default_fitted <- "f =~ y1 + y2 + y3"
+default_parameter_conditions <- "f =~ y2: 0.60, 0.80\nf ~~ f: 0.80, 1.00"
+bollen_population <- "
+ind60 =~ 1*x1 + 2.180*x2 + 1.819*x3
+dem60 =~ 1*y1 + 1.257*y2 + 1.058*y3 + 1.265*y4
+dem65 =~ 1*y5 + 1.186*y6 + 1.280*y7 + 1.266*y8
+dem60 ~ 1.483*ind60
+dem65 ~ 0.572*ind60 + 0.837*dem60
+ind60 ~~ 0.448*ind60
+dem60 ~~ 3.956*dem60
+dem65 ~~ 0.172*dem65
+y1 ~~ 1.892*y5
+y2 ~~ 7.373*y4
+y2 ~~ 2.488*y6
+y3 ~~ 5.067*y7
+y4 ~~ 1.706*y8
+x1 ~~ 0.082*x1
+x2 ~~ 0.120*x2
+x3 ~~ 0.467*x3
+y1 ~~ 1.891*y1
+y2 ~~ 7.373*y2
+y3 ~~ 5.067*y3
+y4 ~~ 3.148*y4
+y5 ~~ 2.351*y5
+y6 ~~ 4.954*y6
+y7 ~~ 3.431*y7
+y8 ~~ 3.254*y8
+"
+bollen_fitted <- "
+ind60 =~ x1 + x2 + x3
+dem60 =~ y1 + y2 + y3 + y4
+dem65 =~ y5 + y6 + y7 + y8
+dem60 ~ ind60
+dem65 ~ ind60 + dem60
+y1 ~~ y5
+y2 ~~ y4 + y6
+y3 ~~ y7
+y4 ~~ y8
+"
+bollen_conditions <- "dem65 ~ dem60: 0.65, 0.85\nind60 =~ x2: 1.80, 2.20\ndem60 ~~ dem60: 3.00, 4.00"
 
 ui <- page_sidebar(
   title = "mcsimr",
@@ -352,7 +451,8 @@ ui <- page_sidebar(
             textAreaInput("factor_covariances", "Factor covariances", "", rows = 3),
             textAreaInput("structural_paths", "Structural regressions", "", rows = 3),
             checkboxInput("include_residuals", "Compute residual variances from standardized loadings", TRUE),
-            actionButton("build_sem", "Build lavaan syntax")
+            actionButton("build_sem", "Build lavaan syntax"),
+            actionButton("load_bollen", "Load Political Democracy example")
           ),
           conditionalPanel(
             "input.simulation_type == 'ols'",
@@ -369,7 +469,9 @@ ui <- page_sidebar(
             textAreaInput("population_model", "Population model", default_population, rows = 9),
             textAreaInput("fitted_model", "Fitted lavaan model", default_fitted, rows = 6),
             textInput("estimator", "Estimators", "ML"),
-            checkboxInput("std_lv", "Use std.lv = TRUE", TRUE)
+            checkboxInput("std_lv", "Use std.lv = TRUE", TRUE),
+            textAreaInput("parameter_conditions", "Parameter conditions", default_parameter_conditions, rows = 5),
+            tags$div(class = "condition-preview", tableOutput("condition_grid"))
           ),
           card_body(
             uiOutput("equations"),
@@ -472,6 +574,24 @@ server <- function(input, output, session) {
     updateTextAreaInput(session, "fitted_model", value = syntax$fitted)
   })
 
+  observeEvent(input$load_bollen, {
+    updateTextAreaInput(session, "population_model", value = trimws(bollen_population))
+    updateTextAreaInput(session, "fitted_model", value = trimws(bollen_fitted))
+    updateTextAreaInput(session, "parameter_conditions", value = bollen_conditions)
+    updateTextInput(session, "factor_names", value = "ind60, dem60, dem65")
+    updateTextAreaInput(session, "indicator_map", value = "ind60: x1, x2, x3\ndem60: y1, y2, y3, y4\ndem65: y5, y6, y7, y8")
+    updateTextAreaInput(session, "loading_map", value = "ind60: 1, 2.180, 1.819\ndem60: 1, 1.257, 1.058, 1.265\ndem65: 1, 1.186, 1.280, 1.266")
+    updateTextAreaInput(session, "factor_covariances", value = "y1 ~~ 1.892*y5\ny2 ~~ 7.373*y4\ny2 ~~ 2.488*y6\ny3 ~~ 5.067*y7\ny4 ~~ 1.706*y8")
+    updateTextAreaInput(session, "structural_paths", value = "dem60 ~ 1.483*ind60\ndem65 ~ 0.572*ind60 + 0.837*dem60")
+  })
+
+  parameter_conditions <- reactive({
+    if (!identical(input$simulation_type, "sem")) {
+      return(NULL)
+    }
+    parse_parameter_condition_lines(input$parameter_conditions)
+  })
+
   spec <- reactive({
     if (identical(input$simulation_type, "sem")) {
       sem_sim_spec(
@@ -480,6 +600,7 @@ server <- function(input, output, session) {
         n = parse_numeric(input$n),
         reps = input$reps,
         estimator = parse_character(input$estimator),
+        parameter_conditions = parameter_conditions(),
         std_lv = input$std_lv,
         alpha = input$alpha,
         seed = input$seed,
@@ -503,6 +624,11 @@ server <- function(input, output, session) {
       )
     }
   })
+
+  output$condition_grid <- renderTable({
+    req(identical(input$simulation_type, "sem"))
+    sem_condition_grid(spec())[c("condition_id", "n", "estimator", "parameter_conditions")]
+  }, striped = TRUE, bordered = TRUE)
 
   observeEvent(input$run, {
     withProgress(message = "Running simulation", value = 0, {
@@ -568,6 +694,10 @@ server <- function(input, output, session) {
 
   output$code <- renderText({
     if (identical(input$simulation_type, "sem")) {
+      pc <- parameter_conditions()
+      if (is.null(pc)) {
+        pc <- sem_parameter_conditions()
+      }
       return(sprintf(
         paste(
           "library(mcsimr)",
@@ -578,6 +708,12 @@ server <- function(input, output, session) {
           "  n = c(%s),",
           "  reps = %s,",
           "  estimator = c(%s),",
+          "  parameter_conditions = sem_parameter_conditions(",
+          "    lhs = c(%s),",
+          "    op = c(%s),",
+          "    rhs = c(%s),",
+          "    values = list(%s)",
+          "  ),",
           "  std_lv = %s,",
           "  alpha = %s,",
           "  seed = %s,",
@@ -601,6 +737,10 @@ server <- function(input, output, session) {
         paste(parse_numeric(input$n), collapse = ", "),
         input$reps,
         paste(sprintf('"%s"', parse_character(input$estimator)), collapse = ", "),
+        paste(sprintf('"%s"', pc$lhs), collapse = ", "),
+        paste(sprintf('"%s"', pc$op), collapse = ", "),
+        paste(sprintf('"%s"', pc$rhs), collapse = ", "),
+        paste(vapply(pc$values, function(x) paste0("c(", paste(x, collapse = ", "), ")"), character(1L)), collapse = ", "),
         if (isTRUE(input$std_lv)) "TRUE" else "FALSE",
         input$alpha,
         input$seed,

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mcsimr | Monte Carlo simulation workbench</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --red: #4A0101;
+      --accent: #C1121F;
+      --ink: #261516;
+      --muted: #6D5558;
+      --paper: #FFF8F7;
+      --panel: #FFFFFF;
+      --line: #E8C8C8;
+    }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.55;
+    }
+    header {
+      background: linear-gradient(135deg, var(--red), #7A0610);
+      color: #FFF7F4;
+      padding: 4.5rem 1.25rem 3.5rem;
+    }
+    main, .inner {
+      width: min(1080px, calc(100% - 2rem));
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 .75rem;
+      font-size: clamp(2.4rem, 7vw, 5.4rem);
+      line-height: .95;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin-top: 2.6rem;
+      color: var(--red);
+      font-size: 1.45rem;
+    }
+    p.lead {
+      max-width: 760px;
+      font-size: 1.2rem;
+      color: #FFE4DF;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      margin-top: 1.5rem;
+    }
+    a.button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.75rem;
+      padding: 0 1rem;
+      border-radius: 8px;
+      background: #FFF7F4;
+      color: var(--red);
+      font-weight: 750;
+      text-decoration: none;
+    }
+    a.button.secondary {
+      background: transparent;
+      color: #FFF7F4;
+      border: 1px solid rgba(255, 247, 244, .65);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1.15rem;
+      box-shadow: 0 12px 28px rgba(74, 1, 1, .08);
+    }
+    code, pre {
+      background: #F7EAEA;
+      color: #321112;
+      border-radius: 6px;
+    }
+    code {
+      padding: .12rem .28rem;
+    }
+    pre {
+      overflow: auto;
+      padding: 1rem;
+      border: 1px solid var(--line);
+    }
+    footer {
+      margin-top: 3rem;
+      padding: 2rem 0;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #FFF7F4;
+        --muted: #EAC2BD;
+        --paper: #180405;
+        --panel: #2B090B;
+        --line: #7E2B31;
+      }
+      h2 { color: #FFD2CC; }
+      code, pre {
+        background: #360D10;
+        color: #FFE7E2;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="inner">
+      <h1>mcsimr</h1>
+      <p class="lead">A local-first R package and Shiny workbench for reproducible Monte Carlo simulation studies, built first for lavaan and structural equation modeling.</p>
+      <div class="actions">
+        <a class="button" href="./">Open the app</a>
+        <a class="button secondary" href="https://github.com/MarcusHarrisUConn/mcsimr">View on GitHub</a>
+      </div>
+    </div>
+  </header>
+  <main>
+    <h2>What It Does</h2>
+    <div class="grid">
+      <section class="card">
+        <h3>Design Conditions</h3>
+        <p>Vary sample sizes, estimators, and lavaan population parameters such as loadings, variances, covariances, regressions, and intercepts.</p>
+      </section>
+      <section class="card">
+        <h3>Run Locally</h3>
+        <p>Run simulations on your own computer with multiple workers, checkpoint each condition, and resume long jobs without starting over.</p>
+      </section>
+      <section class="card">
+        <h3>Export Research Artifacts</h3>
+        <p>Generate APA-style tables, visualizations, raw LaTeX model equations, reproducible R code, and a Quarto project.</p>
+      </section>
+    </div>
+
+    <h2>Install</h2>
+    <pre><code>install.packages("remotes")
+remotes::install_github("MarcusHarrisUConn/mcsimr")</code></pre>
+
+    <h2>Example</h2>
+    <pre><code>library(mcsimr)
+
+pc <- sem_parameter_conditions(
+  lhs = c("f", "f"),
+  op = c("=~", "~~"),
+  rhs = c("y2", "f"),
+  values = list(c(0.60, 0.80), c(0.80, 1.00))
+)
+
+spec <- sem_sim_spec(
+  population_model = "f =~ 0.70*y1 + 0.80*y2 + 0.90*y3
+f ~~ 1*f
+y1 ~~ 0.51*y1
+y2 ~~ 0.36*y2
+y3 ~~ 0.19*y3",
+  fitted_model = "f =~ y1 + y2 + y3",
+  n = c(100, 250, 500),
+  reps = 1000,
+  parameter_conditions = pc
+)
+
+study <- run_simulation_study(spec, workers = 4, resume = TRUE)</code></pre>
+
+    <h2>Roadmap</h2>
+    <p>The next development steps are a richer visual SEM condition builder, stronger APA table exports, job-run dashboards for long simulations, scheduler examples for HPC use, and full CRAN release hardening.</p>
+  </main>
+  <footer>
+    <div class="inner">mcsimr is early-stage research software by Marcus Harris.</div>
+  </footer>
+</body>
+</html>

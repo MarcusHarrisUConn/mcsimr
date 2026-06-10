@@ -76,6 +76,7 @@ sem_sim_spec <- function(population_model,
                          n = c(100, 250, 500),
                          reps = 1000,
                          estimator = "ML",
+                         parameter_conditions = NULL,
                          missing = "listwise",
                          std_lv = TRUE,
                          alpha = 0.05,
@@ -88,6 +89,7 @@ sem_sim_spec <- function(population_model,
   stopifnot(length(n) >= 1L, all(n > 1L))
   stopifnot(reps >= 1L)
   stopifnot(alpha > 0, alpha < 1)
+  parameter_conditions <- normalize_sem_parameter_conditions(parameter_conditions)
 
   spec <- list(
     type = "sem",
@@ -98,6 +100,7 @@ sem_sim_spec <- function(population_model,
     n = as.integer(n),
     reps = as.integer(reps),
     estimator = as.character(estimator),
+    parameter_conditions = parameter_conditions,
     missing = as.character(missing),
     std_lv = isTRUE(std_lv),
     alpha = as.numeric(alpha),
@@ -125,8 +128,30 @@ sem_condition_grid <- function(spec) {
     KEEP.OUT.ATTRS = FALSE,
     stringsAsFactors = FALSE
   )
+
+  parameter_conditions <- normalize_sem_parameter_conditions(spec$parameter_conditions)
+  if (nrow(parameter_conditions) > 0L) {
+    value_grid <- expand.grid(
+      stats::setNames(parameter_conditions$values, sem_condition_column_names(parameter_conditions)),
+      KEEP.OUT.ATTRS = FALSE,
+      stringsAsFactors = FALSE
+    )
+    grid <- cbind(
+      grid[rep(seq_len(nrow(grid)), each = nrow(value_grid)), , drop = FALSE],
+      value_grid[rep(seq_len(nrow(value_grid)), times = nrow(grid)), , drop = FALSE]
+    )
+    labels <- parameter_conditions$label
+    grid$parameter_conditions <- apply(
+      grid[sem_condition_column_names(parameter_conditions)],
+      1L,
+      function(row) paste(paste0(labels, " = ", row), collapse = "; ")
+    )
+  } else {
+    grid$parameter_conditions <- "none"
+  }
+
   grid$condition_id <- seq_len(nrow(grid))
-  grid[c("condition_id", "n", "estimator")]
+  grid[c("condition_id", "n", "estimator", "parameter_conditions", sem_condition_column_names(parameter_conditions))]
 }
 
 spec_equations <- function(spec) {

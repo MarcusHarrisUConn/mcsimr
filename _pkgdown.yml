@@ -1,7 +1,36 @@
 url: http://marcusharrisphd.com/mcsimr/
 template:
   bootstrap: 5
+  bslib:
+    primary: "#7A0610"
 navbar:
   structure:
     left: [intro, reference, articles, news]
     right: [github]
+reference:
+  - title: Simulation specifications
+    contents:
+      - ols_sim_spec
+      - sem_sim_spec
+      - sem_parameter_conditions
+      - sem_condition_grid
+  - title: Run simulations
+    contents:
+      - run_simulation_study
+      - run_ols_simulation
+      - run_sem_simulation
+      - available_cores
+  - title: Summaries and output
+    contents:
+      - summarize_ols_results
+      - summarize_sem_results
+      - apa_metric_table
+      - plot_metric
+      - save_metric_plots
+      - write_apa_tables
+  - title: Reproducibility
+    contents:
+      - export_quarto_project
+      - spec_equations
+      - sem_model_latex
+      - use_mcsimr_app

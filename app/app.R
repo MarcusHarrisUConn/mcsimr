@@ -104,12 +104,25 @@ label, .control-label, .form-label, .shiny-input-container > label,
 .theme-switch input[type='checkbox']:checked::after { transform: translateX(1.45rem); }
 .theme-switch input[type='checkbox']:focus-visible { outline: 3px solid var(--mc-focus); outline-offset: 2px; }
 .theme-switch span { color: var(--mc-text); font-weight: 750; }
-.apa-table { width: 100%; border-collapse: collapse; font-family: Georgia, 'Times New Roman', serif; font-size: 0.92rem; }
+.apa-table { width: 100%; border-collapse: collapse; font-family: Georgia, 'Times New Roman', serif; font-size: 0.92rem; background: var(--mc-panel); color: var(--mc-text); }
 .apa-table caption { caption-side: top; text-align: left; font-weight: 700; color: var(--mc-text); padding-bottom: .65rem; }
 .apa-table thead th { border-top: 2px solid var(--mc-text); border-bottom: 1px solid var(--mc-text); font-weight: 700; }
-.apa-table tbody td { border-bottom: 1px solid var(--mc-border); }
+.apa-table tbody td { border-bottom: 1px solid var(--mc-border); color: var(--mc-text); }
 .apa-table tbody tr:last-child td { border-bottom: 2px solid var(--mc-text); }
 .apa-table th, .apa-table td { padding: .45rem .55rem; vertical-align: top; }
+pre, .shiny-text-output, .shiny-bound-output pre {
+  background: var(--mc-input) !important;
+  color: var(--mc-text) !important;
+  border: 1px solid var(--mc-border) !important;
+  border-radius: 8px;
+}
+body.mc-dark code, body.mc-dark pre { color: #FFE7E2 !important; }
+.table, table { color: var(--mc-text); }
+.table > :not(caption) > * > * {
+  background-color: var(--mc-panel);
+  color: var(--mc-text);
+  border-bottom-color: var(--mc-border);
+}
 "
 
 app_script <- "

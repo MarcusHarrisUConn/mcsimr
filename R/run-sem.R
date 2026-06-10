@@ -1,8 +1,20 @@
 run_sem_replication <- function(spec, condition, rep_id) {
   validate_sem_spec(spec)
+  conditioned_population <- tryCatch(
+    apply_sem_parameter_conditions(
+      population_model = spec$population_model,
+      parameter_conditions = spec$parameter_conditions,
+      condition = condition
+    ),
+    error = identity
+  )
+  if (inherits(conditioned_population, "error")) {
+    return(sem_error_row(spec, condition, rep_id, conditionMessage(conditioned_population)))
+  }
+
   dat <- tryCatch(
     lavaan::simulateData(
-      model = spec$population_model,
+      model = conditioned_population,
       sample.nobs = condition$n
     ),
     error = identity
@@ -31,7 +43,7 @@ run_sem_replication <- function(spec, condition, rep_id) {
     return(sem_error_row(spec, condition, rep_id, conditionMessage(pe), converged = converged))
   }
 
-  true_values <- sem_true_values(spec$population_model)
+  true_values <- sem_true_values(conditioned_population)
   pe$term <- paste(pe$lhs, pe$op, pe$rhs)
   pe$key <- sem_param_key(pe$lhs, pe$op, pe$rhs)
   pe$true_value <- true_values[pe$key]
@@ -43,6 +55,7 @@ run_sem_replication <- function(spec, condition, rep_id) {
     condition_id = condition$condition_id,
     n = condition$n,
     estimator = condition$estimator,
+    parameter_conditions = condition$parameter_conditions,
     rep_id = rep_id,
     term = pe$term,
     lhs = pe$lhs,
@@ -81,7 +94,9 @@ run_sem_condition <- function(spec, condition, workers = 1L) {
       varlist = c(
         "spec", "condition", "run_sem_replication", "sem_error_row",
         "sem_true_values", "sem_param_key", "sem_fit_indices",
-        "sem_improper_solution", "validate_sem_spec"
+        "sem_improper_solution", "validate_sem_spec",
+        "apply_sem_parameter_conditions", "normalize_sem_parameter_conditions",
+        "sem_parameter_conditions", "sem_condition_column_names"
       ),
       envir = environment()
     )
@@ -137,7 +152,11 @@ run_sem_simulation <- function(spec,
 }
 
 sem_true_values <- function(population_model) {
-  tab <- lavaan::lavaanify(population_model, fixed.x = FALSE)
+  if (is.data.frame(population_model)) {
+    tab <- population_model
+  } else {
+    tab <- lavaan::lavaanify(population_model, fixed.x = FALSE)
+  }
   keep <- !is.na(tab$ustart) & tab$op %in% c("=~", "~", "~~", "~1")
   vals <- tab$ustart[keep]
   names(vals) <- sem_param_key(tab$lhs[keep], tab$op[keep], tab$rhs[keep])
@@ -166,6 +185,7 @@ sem_error_row <- function(spec, condition, rep_id, error, converged = FALSE) {
     condition_id = condition$condition_id,
     n = condition$n,
     estimator = condition$estimator,
+    parameter_conditions = condition$parameter_conditions,
     rep_id = rep_id,
     term = NA_character_,
     lhs = NA_character_,
