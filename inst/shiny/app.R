@@ -490,6 +490,10 @@ ui <- page_sidebar(
             textAreaInput("population_model", "Population model", default_population, rows = 9),
             textAreaInput("fitted_model", "Fitted lavaan model", default_fitted, rows = 6),
             textInput("estimator", "Estimators", "ML"),
+            selectInput("missing", "lavaan missing method", choices = c("listwise", "fiml", "ml", "direct"), selected = "listwise"),
+            textInput("missing_rate", "MCAR missing rates", "0"),
+            textInput("skewness", "Observed-variable skewness", "0"),
+            textInput("kurtosis", "Observed-variable excess kurtosis", "0"),
             checkboxInput("std_lv", "Use std.lv = TRUE", TRUE),
             textAreaInput("parameter_conditions", "Parameter conditions", default_parameter_conditions, rows = 5),
             tags$div(class = "condition-preview", tableOutput("condition_grid"))
@@ -534,6 +538,20 @@ ui <- page_sidebar(
       )
     ),
     nav_panel(
+      "Run Dashboard",
+      layout_columns(
+        col_widths = c(4, 8),
+        card(
+          card_header("Current run"),
+          uiOutput("run_status_cards")
+        ),
+        card(
+          card_header("Run log"),
+          tableOutput("run_log")
+        )
+      )
+    ),
+    nav_panel(
       "R Code",
       card(
         card_header("Generated reproducible R code"),
@@ -566,6 +584,12 @@ server <- function(input, output, session) {
   study <- reactiveVal(NULL)
   export_status <- reactiveVal("No project exported yet.")
   exported_path <- reactiveVal(NULL)
+  run_log <- reactiveVal(data.frame(
+    time = character(),
+    status = character(),
+    message = character(),
+    stringsAsFactors = FALSE
+  ))
   visual_conditions <- reactiveVal(data.frame(
     lhs = character(),
     op = character(),
@@ -573,6 +597,18 @@ server <- function(input, output, session) {
     values = character(),
     stringsAsFactors = FALSE
   ))
+
+  append_run_log <- function(status, message) {
+    run_log(rbind(
+      run_log(),
+      data.frame(
+        time = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+        status = status,
+        message = message,
+        stringsAsFactors = FALSE
+      )
+    ))
+  }
 
   active_workers <- reactive({
     if (isTRUE(input$use_parallel)) {
@@ -663,6 +699,10 @@ server <- function(input, output, session) {
         reps = input$reps,
         estimator = parse_character(input$estimator),
         parameter_conditions = parameter_conditions(),
+        missing_rate = parse_numeric(input$missing_rate),
+        skewness = parse_numeric(input$skewness),
+        kurtosis = parse_numeric(input$kurtosis),
+        missing = input$missing,
         std_lv = input$std_lv,
         alpha = input$alpha,
         seed = input$seed,
@@ -689,11 +729,25 @@ server <- function(input, output, session) {
 
   output$condition_grid <- renderTable({
     req(identical(input$simulation_type, "sem"))
-    sem_condition_grid(spec())[c("condition_id", "n", "estimator", "parameter_conditions")]
+    sem_condition_grid(spec())[c(
+      "condition_id", "n", "estimator", "missing_rate", "skewness", "kurtosis",
+      "parameter_conditions"
+    )]
   }, striped = TRUE, bordered = TRUE)
 
   observeEvent(input$run, {
+    grid <- if (identical(spec()$type, "sem")) sem_condition_grid(spec()) else NULL
+    append_run_log(
+      "queued",
+      paste0(
+        "Prepared ", if (is.null(grid)) "OLS" else nrow(grid),
+        " condition", if (!is.null(grid) && nrow(grid) == 1L) "" else "s",
+        " x ", input$reps, " replications on ", active_workers(), " worker",
+        if (active_workers() == 1L) "." else "s."
+      )
+    )
     withProgress(message = "Running simulation", value = 0, {
+      append_run_log("running", paste("Checkpoint directory:", input$checkpoint_dir))
       out <- run_simulation_study(
         spec(),
         workers = active_workers(),
@@ -702,6 +756,7 @@ server <- function(input, output, session) {
       )
       incProgress(0.8)
       study(out)
+      append_run_log("completed", paste("Finished", nrow(out$summary), "summary rows."))
       incProgress(0.2)
     })
   })
@@ -717,6 +772,22 @@ server <- function(input, output, session) {
     exported_path(path)
     updateSelectInput(session, "export_file", choices = exported_files(path))
     export_status(paste("Exported reproducible Quarto project to:", path))
+    append_run_log("exported", paste("Quarto project:", path))
+  })
+
+  output$run_log <- renderTable({
+    run_log()
+  }, striped = TRUE, bordered = TRUE)
+
+  output$run_status_cards <- renderUI({
+    current <- run_log()
+    last <- if (nrow(current)) current[nrow(current), , drop = FALSE] else NULL
+    tagList(
+      tags$p(tags$strong("Status"), tags$br(), if (is.null(last)) "Idle" else last$status),
+      tags$p(tags$strong("Last update"), tags$br(), if (is.null(last)) "No activity yet." else last$time),
+      tags$p(tags$strong("Workers"), tags$br(), active_workers()),
+      tags$p(tags$strong("Checkpointing"), tags$br(), input$checkpoint_dir)
+    )
   })
 
   output$summary <- renderTable({
@@ -770,6 +841,10 @@ server <- function(input, output, session) {
           "  n = c(%s),",
           "  reps = %s,",
           "  estimator = c(%s),",
+          "  missing = %s,",
+          "  missing_rate = c(%s),",
+          "  skewness = c(%s),",
+          "  kurtosis = c(%s),",
           "  parameter_conditions = sem_parameter_conditions(",
           "    lhs = c(%s),",
           "    op = c(%s),",
@@ -799,6 +874,10 @@ server <- function(input, output, session) {
         paste(parse_numeric(input$n), collapse = ", "),
         input$reps,
         paste(sprintf('"%s"', parse_character(input$estimator)), collapse = ", "),
+        deparse(input$missing),
+        paste(parse_numeric(input$missing_rate), collapse = ", "),
+        paste(parse_numeric(input$skewness), collapse = ", "),
+        paste(parse_numeric(input$kurtosis), collapse = ", "),
         paste(sprintf('"%s"', pc$lhs), collapse = ", "),
         paste(sprintf('"%s"', pc$op), collapse = ", "),
         paste(sprintf('"%s"', pc$rhs), collapse = ", "),

@@ -11,8 +11,10 @@ the primary target audience.
 
 The project now starts from `lavaan`: users can define a population model,
 define a fitted model, set sample-size and estimator conditions, choose the
-number of replications and seed, run across local cores, and export APA-style
-tables, figures, model equations, raw LaTeX, and a reproducible Quarto project.
+number of replications and seed, vary population parameters, impose MCAR
+missingness, request nonnormal generated data, run across local cores, and
+export APA-style tables, figures, model equations, raw LaTeX, and a
+reproducible Quarto project.
 OLS regression remains available as a special case and as a simpler first
 engine.
 
@@ -93,6 +95,10 @@ spec <- sem_sim_spec(
   reps = 1000,
   estimator = c("ML"),
   parameter_conditions = parameter_conditions,
+  missing = "fiml",
+  missing_rate = c(0, 0.10),
+  skewness = c(0, 1),
+  kurtosis = c(0, 2),
   std_lv = TRUE,
   alpha = 0.05,
   seed = 20260608
@@ -170,10 +176,14 @@ engine and can write checkpoints to disk. It now uses a tabbed workflow:
 - **Model Builder**: build lavaan SEM syntax from latent variables, indicators,
   loadings, covariances, and structural paths, or edit raw lavaan syntax. SEM
   users can vary lavaan population parameters across conditions using parameter
-  rows such as `f =~ y2: 0.60, 0.80` or `dem65 ~ dem60: 0.65, 0.85`.
+  rows such as `f =~ y2: 0.60, 0.80` or `dem65 ~ dem60: 0.65, 0.85`, and can
+  cross those factors with sample size, estimator, MCAR missing rates, skewness,
+  and excess kurtosis.
 - **Results**: inspect simulation summaries and APA-style tables.
 - **Visualizations**: plot metrics such as bias, RMSE, coverage, power, Type I
   error, and SEM fit indices.
+- **Run Dashboard**: monitor queued, running, completed, and exported actions
+  while checkpoints accumulate on disk.
 - **R Code**: copy the fully reproducible code generated from the current setup.
 - **Quarto Export**: write a runnable Quarto project with code, tables, figures,
   rendered equations, and raw LaTeX.
@@ -261,7 +271,8 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 ### Phase 2: Better long-run ergonomics
 
 - [ ] Background job launcher from Shiny
-- [ ] Progress logs and run registry
+- [x] First progress log and run dashboard
+- [ ] Persistent run registry
 - [ ] Safer resume/restart controls
 - [ ] Batch-size controls for very large replication counts
 - [x] Generic lavaan parameter condition grid
@@ -286,7 +297,9 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 - [x] SEM Quarto report template
 - [x] loadings, factor variances, regressions, covariances, and residuals as
   condition factors through lavaan parameter conditions
-- [ ] missing-data conditions
+- [x] MCAR missing-data rate conditions
+- [x] Nonnormality conditions through lavaan skewness and excess kurtosis
+- [ ] MAR/MNAR missing-data templates
 - [ ] model misspecification templates
 - [ ] multi-group SEM templates
 

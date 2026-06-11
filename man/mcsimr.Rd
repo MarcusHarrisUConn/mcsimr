@@ -44,8 +44,9 @@ ols_sim_spec(n = c(100, 250, 500), reps = 1000,
 
 sem_sim_spec(population_model, fitted_model = population_model,
   n = c(100, 250, 500), reps = 1000, estimator = "ML",
-  parameter_conditions = NULL, missing = "listwise", std_lv = TRUE,
-  alpha = 0.05, seed = 20260608, metrics = default_metrics("sem"),
+  parameter_conditions = NULL, missing_rate = 0, skewness = 0,
+  kurtosis = 0, missing = "listwise", std_lv = TRUE, alpha = 0.05,
+  seed = 20260608, metrics = default_metrics("sem"),
   study_name = "lavaan Monte Carlo Simulation",
   research_question = "How does SEM parameter recovery vary across sample sizes?")
 
@@ -107,6 +108,9 @@ use_mcsimr_app(...)
 \item{fitted_model}{lavaan syntax fitted to each simulated data set.}
 \item{estimator}{lavaan estimator condition or conditions.}
 \item{parameter_conditions}{Optional lavaan parameter values to vary across SEM simulation conditions.}
+\item{missing_rate}{MCAR missing-data rate condition or conditions applied after data generation.}
+\item{skewness}{Observed-variable skewness condition or conditions passed to \code{lavaan::simulateData()}.}
+\item{kurtosis}{Observed-variable excess kurtosis condition or conditions passed to \code{lavaan::simulateData()}.}
 \item{lhs}{Left-hand side parameter names for lavaan parameter conditions.}
 \item{op}{lavaan operator for each parameter condition, such as \code{=~}, \code{~}, or \code{~~}.}
 \item{rhs}{Right-hand side parameter names for lavaan parameter conditions.}

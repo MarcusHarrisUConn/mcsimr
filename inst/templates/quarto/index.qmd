@@ -1,5 +1,5 @@
 ---
-title: "OLS Monte Carlo Simulation"
+title: "Monte Carlo Simulation Report"
 format: html
 execute:
   echo: true
@@ -16,7 +16,11 @@ library(yaml)
 
 ```{r}
 spec <- yaml::read_yaml("spec.yml")
-class(spec) <- c("mcsimr_ols_spec", "mcsimr_spec", "list")
+if (identical(spec$type, "sem")) {
+  class(spec) <- c("mcsimr_sem_spec", "mcsimr_spec", "list")
+} else {
+  class(spec) <- c("mcsimr_ols_spec", "mcsimr_spec", "list")
+}
 spec$study_name
 spec$research_question
 ```

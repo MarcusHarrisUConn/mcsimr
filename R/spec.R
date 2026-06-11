@@ -77,6 +77,9 @@ sem_sim_spec <- function(population_model,
                          reps = 1000,
                          estimator = "ML",
                          parameter_conditions = NULL,
+                         missing_rate = 0,
+                         skewness = 0,
+                         kurtosis = 0,
                          missing = "listwise",
                          std_lv = TRUE,
                          alpha = 0.05,
@@ -89,6 +92,9 @@ sem_sim_spec <- function(population_model,
   stopifnot(length(n) >= 1L, all(n > 1L))
   stopifnot(reps >= 1L)
   stopifnot(alpha > 0, alpha < 1)
+  stopifnot(length(missing_rate) >= 1L, all(missing_rate >= 0), all(missing_rate < 1))
+  stopifnot(length(skewness) >= 1L)
+  stopifnot(length(kurtosis) >= 1L)
   parameter_conditions <- normalize_sem_parameter_conditions(parameter_conditions)
 
   spec <- list(
@@ -101,6 +107,9 @@ sem_sim_spec <- function(population_model,
     reps = as.integer(reps),
     estimator = as.character(estimator),
     parameter_conditions = parameter_conditions,
+    missing_rate = as.numeric(missing_rate),
+    skewness = as.numeric(skewness),
+    kurtosis = as.numeric(kurtosis),
     missing = as.character(missing),
     std_lv = isTRUE(std_lv),
     alpha = as.numeric(alpha),
@@ -125,6 +134,9 @@ sem_condition_grid <- function(spec) {
   grid <- expand.grid(
     n = spec$n,
     estimator = spec$estimator,
+    missing_rate = spec$missing_rate,
+    skewness = spec$skewness,
+    kurtosis = spec$kurtosis,
     KEEP.OUT.ATTRS = FALSE,
     stringsAsFactors = FALSE
   )
@@ -151,7 +163,10 @@ sem_condition_grid <- function(spec) {
   }
 
   grid$condition_id <- seq_len(nrow(grid))
-  grid[c("condition_id", "n", "estimator", "parameter_conditions", sem_condition_column_names(parameter_conditions))]
+  grid[c(
+    "condition_id", "n", "estimator", "missing_rate", "skewness", "kurtosis",
+    "parameter_conditions", sem_condition_column_names(parameter_conditions)
+  )]
 }
 
 spec_equations <- function(spec) {

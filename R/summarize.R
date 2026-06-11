@@ -65,7 +65,7 @@ apa_metric_table <- function(summary,
                              digits = 3L,
                              caption = "Table 1\nMonte Carlo simulation performance metrics by condition and parameter.") {
   base_cols <- c("condition_id", "n", "predictor_correlation", "error_sd", "term", "true_value", "reps")
-  base_cols <- c(base_cols, "estimator", "parameter_conditions")
+  base_cols <- c(base_cols, "estimator", "missing_rate", "skewness", "kurtosis", "parameter_conditions")
   cols <- intersect(c(base_cols, metrics), names(summary))
   tab <- summary[, cols, drop = FALSE]
   labels <- c(
@@ -74,6 +74,9 @@ apa_metric_table <- function(summary,
     predictor_correlation = "Predictor r",
     error_sd = "Residual SD",
     estimator = "Estimator",
+    missing_rate = "Missing rate",
+    skewness = "Skewness",
+    kurtosis = "Kurtosis",
     parameter_conditions = "Varied parameter(s)",
     term = "Parameter",
     true_value = "Population",
@@ -114,7 +117,8 @@ summarize_sem_results <- function(results, metrics = default_metrics("sem")) {
   }
 
   split_key <- interaction(
-    x$condition_id, x$n, x$estimator, x$parameter_conditions, x$term,
+    x$condition_id, x$n, x$estimator, x$missing_rate, x$skewness, x$kurtosis,
+    x$parameter_conditions, x$term,
     drop = TRUE,
     sep = "|"
   )
@@ -132,6 +136,9 @@ summarize_sem_results <- function(results, metrics = default_metrics("sem")) {
       condition_id = dat$condition_id[1L],
       n = dat$n[1L],
       estimator = dat$estimator[1L],
+      missing_rate = dat$missing_rate[1L],
+      skewness = dat$skewness[1L],
+      kurtosis = dat$kurtosis[1L],
       parameter_conditions = dat$parameter_conditions[1L],
       term = dat$term[1L],
       true_value = true,
@@ -160,7 +167,8 @@ summarize_sem_results <- function(results, metrics = default_metrics("sem")) {
   rownames(out) <- NULL
   out <- out[order(out$condition_id, out$term), ]
   keep <- unique(c(
-    "condition_id", "n", "estimator", "parameter_conditions", "term", "true_value", "reps", metrics
+    "condition_id", "n", "estimator", "missing_rate", "skewness", "kurtosis",
+    "parameter_conditions", "term", "true_value", "reps", metrics
   ))
   out[, intersect(keep, names(out)), drop = FALSE]
 }

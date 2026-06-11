@@ -15,13 +15,16 @@ run_sem_replication <- function(spec, condition, rep_id) {
   dat <- tryCatch(
     lavaan::simulateData(
       model = conditioned_population,
-      sample.nobs = condition$n
+      sample.nobs = condition$n,
+      skewness = sem_moment_arg(condition$skewness),
+      kurtosis = sem_moment_arg(condition$kurtosis)
     ),
     error = identity
   )
   if (inherits(dat, "error")) {
     return(sem_error_row(spec, condition, rep_id, conditionMessage(dat)))
   }
+  dat <- apply_mcar_missing(dat, condition$missing_rate)
 
   fit <- tryCatch(
     lavaan::sem(
@@ -55,6 +58,9 @@ run_sem_replication <- function(spec, condition, rep_id) {
     condition_id = condition$condition_id,
     n = condition$n,
     estimator = condition$estimator,
+    missing_rate = condition$missing_rate,
+    skewness = condition$skewness,
+    kurtosis = condition$kurtosis,
     parameter_conditions = condition$parameter_conditions,
     rep_id = rep_id,
     term = pe$term,
@@ -96,7 +102,8 @@ run_sem_condition <- function(spec, condition, workers = 1L) {
         "sem_true_values", "sem_param_key", "sem_fit_indices",
         "sem_improper_solution", "validate_sem_spec",
         "apply_sem_parameter_conditions", "normalize_sem_parameter_conditions",
-        "sem_parameter_conditions", "sem_condition_column_names"
+        "sem_parameter_conditions", "sem_condition_column_names",
+        "apply_mcar_missing", "sem_moment_arg"
       ),
       envir = environment()
     )
@@ -180,11 +187,36 @@ sem_improper_solution <- function(pe) {
   any(is.finite(variances$est) & variances$est < 0)
 }
 
+sem_moment_arg <- function(x) {
+  if (length(x) == 0L || all(is.na(x)) || isTRUE(all.equal(as.numeric(x), 0))) {
+    return(NULL)
+  }
+  as.numeric(x)
+}
+
+apply_mcar_missing <- function(dat, rate) {
+  rate <- as.numeric(rate)[1L]
+  if (is.na(rate) || rate <= 0) {
+    return(dat)
+  }
+  mask <- matrix(
+    stats::runif(nrow(dat) * ncol(dat)) < rate,
+    nrow = nrow(dat),
+    ncol = ncol(dat)
+  )
+  out <- dat
+  out[mask] <- NA
+  out
+}
+
 sem_error_row <- function(spec, condition, rep_id, error, converged = FALSE) {
   data.frame(
     condition_id = condition$condition_id,
     n = condition$n,
     estimator = condition$estimator,
+    missing_rate = condition$missing_rate,
+    skewness = condition$skewness,
+    kurtosis = condition$kurtosis,
     parameter_conditions = condition$parameter_conditions,
     rep_id = rep_id,
     term = NA_character_,

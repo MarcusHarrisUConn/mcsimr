@@ -36,6 +36,10 @@ list(
       reps = 1000,
       estimator = "ML",
       parameter_conditions = parameter_conditions,
+      missing = "fiml",
+      missing_rate = c(0, 0.10),
+      skewness = c(0, 1),
+      kurtosis = c(0, 2),
       seed = 20260608
     )
   ),

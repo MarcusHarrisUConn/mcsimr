@@ -326,7 +326,8 @@ apa_table_ui <- function(tab) {
   )
 }
 
-quarto_files <- function(population_model, fitted_model, n, reps, seed) {
+quarto_files <- function(population_model, fitted_model, n, reps, seed,
+                         missing_method, missing_rate, skewness, kurtosis) {
   run_r <- sprintf(
     paste(
       "library(mcsimr)",
@@ -340,6 +341,10 @@ quarto_files <- function(population_model, fitted_model, n, reps, seed) {
       "  n = c(%s),",
       "  reps = %s,",
       "  estimator = 'ML',",
+      "  missing = %s,",
+      "  missing_rate = c(%s),",
+      "  skewness = c(%s),",
+      "  kurtosis = c(%s),",
       "  seed = %s",
       ")",
       "",
@@ -353,6 +358,10 @@ quarto_files <- function(population_model, fitted_model, n, reps, seed) {
     deparse(fitted_model),
     paste(parse_numeric(n), collapse = ", "),
     reps,
+    deparse(missing_method),
+    paste(parse_numeric(missing_rate), collapse = ", "),
+    paste(parse_numeric(skewness), collapse = ", "),
+    paste(parse_numeric(kurtosis), collapse = ", "),
     seed
   )
   list(
@@ -386,6 +395,10 @@ quarto_files <- function(population_model, fitted_model, n, reps, seed) {
       paste0("reps: ", reps),
       paste0("seed: ", seed),
       "estimator: ML",
+      paste0("missing: ", missing_method),
+      paste0("missing_rate: [", paste(parse_numeric(missing_rate), collapse = ", "), "]"),
+      paste0("skewness: [", paste(parse_numeric(skewness), collapse = ", "), "]"),
+      paste0("kurtosis: [", paste(parse_numeric(kurtosis), collapse = ", "), "]"),
       sep = "\n"
     ),
     "results/model-equations.tex" = paste(sem_model_latex(fitted_model), collapse = "\n")
@@ -423,6 +436,10 @@ ui <- page_sidebar(
           card_header("Generated lavaan syntax"),
           textAreaInput("population_model", "Population model", "f =~ 0.70*y1 + 0.80*y2 + 0.90*y3\nf ~~ 1*f\ny1 ~~ 0.51*y1\ny2 ~~ 0.36*y2\ny3 ~~ 0.19*y3", rows = 8),
           textAreaInput("fitted_model", "Fitted lavaan model", "f =~ y1 + y2 + y3", rows = 5),
+          selectInput("missing_method", "lavaan missing method", choices = c("listwise", "fiml", "ml", "direct"), selected = "listwise"),
+          textInput("missing_rate", "MCAR missing rates", "0"),
+          textInput("skewness", "Observed-variable skewness", "0"),
+          textInput("kurtosis", "Observed-variable excess kurtosis", "0"),
           uiOutput("equations"),
           verbatimTextOutput("equations_raw")
         )
@@ -439,6 +456,14 @@ ui <- page_sidebar(
         col_widths = c(3, 9),
         card(card_header("Plot controls"), selectInput("plot_metric", "Metric", c("bias", "rmse", "coverage", "power", "type_i_error"))),
         card(card_header("Metric plot"), plotOutput("metric_plot", height = "520px"))
+      )
+    ),
+    nav_panel(
+      "Run Dashboard",
+      layout_columns(
+        col_widths = c(4, 8),
+        card(card_header("Current run"), uiOutput("run_status_cards")),
+        card(card_header("Run log"), tableOutput("run_log"))
       )
     ),
     nav_panel("R Code", card(card_header("Generated R code"), verbatimTextOutput("code"))),
@@ -458,6 +483,24 @@ ui <- page_sidebar(
 
 server <- function(input, output, session) {
   summary_tbl <- reactiveVal(NULL)
+  run_log <- reactiveVal(data.frame(
+    time = character(),
+    status = character(),
+    message = character(),
+    stringsAsFactors = FALSE
+  ))
+
+  append_run_log <- function(status, message) {
+    run_log(rbind(
+      run_log(),
+      data.frame(
+        time = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+        status = status,
+        message = message,
+        stringsAsFactors = FALSE
+      )
+    ))
+  }
 
   observeEvent(input$build_sem, {
     syntax <- build_sem_syntax(input$factor_names, input$indicator_map, input$loading_map, input$factor_covariances, input$structural_paths)
@@ -471,6 +514,7 @@ server <- function(input, output, session) {
     rho_values <- 0.30
     error_values <- 1
     withProgress(message = "Running browser OLS demo", value = 0, {
+      append_run_log("running", paste("Browser demo:", length(n_values), "sample-size condition(s)."))
       set.seed(input$seed)
       grid <- expand.grid(n = n_values, predictor_correlation = rho_values, error_sd = error_values)
       grid$condition_id <- seq_len(nrow(grid))
@@ -483,6 +527,7 @@ server <- function(input, output, session) {
         })
       }), recursive = FALSE)
       summary_tbl(summarize_results(do.call(rbind, reps), input$alpha))
+      append_run_log("completed", paste("Finished", nrow(summary_tbl()), "summary rows."))
     })
   })
 
@@ -524,18 +569,44 @@ server <- function(input, output, session) {
     legend("topright", legend = terms, col = cols, pch = cols, lty = 1, bty = "n")
   })
 
+  output$run_log <- renderTable({
+    run_log()
+  }, striped = TRUE, bordered = TRUE)
+
+  output$run_status_cards <- renderUI({
+    current <- run_log()
+    last <- if (nrow(current)) current[nrow(current), , drop = FALSE] else NULL
+    tagList(
+      tags$p(tags$strong("Status"), tags$br(), if (is.null(last)) "Idle" else last$status),
+      tags$p(tags$strong("Last update"), tags$br(), if (is.null(last)) "No activity yet." else last$time),
+      tags$p(tags$strong("Browser limit"), tags$br(), "Small demo runs only; large SEM studies should use the local package app.")
+    )
+  })
+
   output$code <- renderText({
-    quarto_files(input$population_model, input$fitted_model, input$n, input$reps, input$seed)[["run.R"]]
+    quarto_files(
+      input$population_model, input$fitted_model, input$n, input$reps, input$seed,
+      input$missing_method, input$missing_rate, input$skewness, input$kurtosis
+    )[["run.R"]]
   })
 
   output$quarto_preview <- renderText({
-    quarto_files(input$population_model, input$fitted_model, input$n, input$reps, input$seed)[[input$quarto_file]]
+    quarto_files(
+      input$population_model, input$fitted_model, input$n, input$reps, input$seed,
+      input$missing_method, input$missing_rate, input$skewness, input$kurtosis
+    )[[input$quarto_file]]
   })
 
   output$download_quarto_file <- downloadHandler(
     filename = function() basename(input$quarto_file),
     content = function(file) {
-      writeLines(quarto_files(input$population_model, input$fitted_model, input$n, input$reps, input$seed)[[input$quarto_file]], file)
+      writeLines(
+        quarto_files(
+          input$population_model, input$fitted_model, input$n, input$reps, input$seed,
+          input$missing_method, input$missing_rate, input$skewness, input$kurtosis
+        )[[input$quarto_file]],
+        file
+      )
     }
   )
 
@@ -544,7 +615,10 @@ server <- function(input, output, session) {
     content = function(file) {
       tmp <- tempfile("mcsimr-quarto")
       dir.create(tmp)
-      files <- quarto_files(input$population_model, input$fitted_model, input$n, input$reps, input$seed)
+      files <- quarto_files(
+        input$population_model, input$fitted_model, input$n, input$reps, input$seed,
+        input$missing_method, input$missing_rate, input$skewness, input$kurtosis
+      )
       for (nm in names(files)) {
         target <- file.path(tmp, nm)
         dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
