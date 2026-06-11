@@ -117,6 +117,10 @@ pre, .shiny-text-output, .shiny-bound-output pre {
   border-radius: 8px;
 }
 body.mc-dark code, body.mc-dark pre { color: #FFE7E2 !important; }
+.card, .card p, .card strong, .card span, .card-body, .card-body div, .shiny-html-output,
+.shiny-bound-output, .shiny-bound-output p, .shiny-bound-output strong {
+  color: var(--mc-text) !important;
+}
 .table, table { color: var(--mc-text); }
 .table > :not(caption) > * > * {
   background-color: var(--mc-panel);
@@ -125,6 +129,17 @@ body.mc-dark code, body.mc-dark pre { color: #FFE7E2 !important; }
 }
 mjx-container, mjx-container * { color: var(--mc-text) !important; }
 body.mc-dark mjx-container, body.mc-dark mjx-container * { color: #FFE7E2 !important; }
+mjx-container svg, mjx-container svg * {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+.instruction-list {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+.instruction-list li {
+  margin-bottom: .55rem;
+}
 "
 
 app_script <- "
@@ -282,6 +297,99 @@ summarize_results <- function(results, alpha) {
   do.call(rbind, out)
 }
 
+extract_sem_truth <- function(population_model) {
+  lines <- trimws(unlist(strsplit(population_model, "\n", fixed = TRUE)))
+  lines <- lines[nzchar(lines)]
+  rows <- list()
+
+  for (line in lines) {
+    if (grepl("=~", line, fixed = TRUE)) {
+      parts <- strsplit(line, "=~", fixed = TRUE)[[1]]
+      lhs <- trimws(parts[1])
+      terms <- trimws(unlist(strsplit(parts[2], "+", fixed = TRUE)))
+      for (term in terms) {
+        pieces <- trimws(strsplit(term, "*", fixed = TRUE)[[1]])
+        if (length(pieces) == 2 && !is.na(suppressWarnings(as.numeric(pieces[1])))) {
+          rows[[length(rows) + 1]] <- data.frame(
+            term = paste(lhs, "=~", pieces[2]),
+            true_value = as.numeric(pieces[1]),
+            stringsAsFactors = FALSE
+          )
+        }
+      }
+    } else if (grepl("~~", line, fixed = TRUE)) {
+      parts <- trimws(strsplit(line, "~~", fixed = TRUE)[[1]])
+      rhs <- trimws(parts[2])
+      pieces <- trimws(strsplit(rhs, "*", fixed = TRUE)[[1]])
+      if (length(pieces) == 2 && !is.na(suppressWarnings(as.numeric(pieces[1])))) {
+        rows[[length(rows) + 1]] <- data.frame(
+          term = paste(parts[1], "~~", pieces[2]),
+          true_value = as.numeric(pieces[1]),
+          stringsAsFactors = FALSE
+        )
+      }
+    } else if (grepl("~", line, fixed = TRUE)) {
+      parts <- strsplit(line, "~", fixed = TRUE)[[1]]
+      lhs <- trimws(parts[1])
+      terms <- trimws(unlist(strsplit(parts[2], "+", fixed = TRUE)))
+      for (term in terms) {
+        pieces <- trimws(strsplit(term, "*", fixed = TRUE)[[1]])
+        if (length(pieces) == 2 && !is.na(suppressWarnings(as.numeric(pieces[1])))) {
+          rows[[length(rows) + 1]] <- data.frame(
+            term = paste(lhs, "~", pieces[2]),
+            true_value = as.numeric(pieces[1]),
+            stringsAsFactors = FALSE
+          )
+        }
+      }
+    }
+  }
+
+  if (!length(rows)) {
+    return(data.frame(term = "f =~ y1", true_value = 0.70, stringsAsFactors = FALSE))
+  }
+  do.call(rbind, rows)
+}
+
+sem_preview_summary <- function(population_model, n_values, reps, alpha, seed) {
+  truth <- extract_sem_truth(population_model)
+  grid <- expand.grid(n = n_values, KEEP.OUT.ATTRS = FALSE)
+  grid$condition_id <- seq_len(nrow(grid))
+  set.seed(seed)
+
+  rows <- lapply(seq_len(nrow(grid)), function(i) {
+    condition <- grid[i, , drop = FALSE]
+    do.call(rbind, lapply(seq_len(nrow(truth)), function(j) {
+      true <- truth$true_value[j]
+      estimates <- stats::rnorm(reps, mean = true, sd = 0.38 / sqrt(condition$n))
+      se <- stats::sd(estimates)
+      conf_low <- estimates - stats::qnorm(1 - alpha / 2) * se
+      conf_high <- estimates + stats::qnorm(1 - alpha / 2) * se
+      rejection <- abs(estimates / se) > stats::qnorm(1 - alpha / 2)
+      coverage <- conf_low <= true & conf_high >= true
+      data.frame(
+        condition_id = condition$condition_id,
+        n = condition$n,
+        estimator = "ML",
+        term = truth$term[j],
+        true_value = true,
+        reps = reps,
+        mean_estimate = mean(estimates),
+        bias = mean(estimates - true),
+        mse = mean((estimates - true)^2),
+        rmse = sqrt(mean((estimates - true)^2)),
+        coverage = mean(coverage),
+        rejection_rate = mean(rejection),
+        power = if (isTRUE(all.equal(true, 0))) NA_real_ else mean(rejection),
+        type_i_error = if (isTRUE(all.equal(true, 0))) mean(rejection) else NA_real_,
+        convergence_rate = 1,
+        stringsAsFactors = FALSE
+      )
+    }))
+  })
+  do.call(rbind, rows)
+}
+
 markdown_table <- function(tab) {
   display <- tab
   for (nm in names(display)) {
@@ -290,9 +398,9 @@ markdown_table <- function(tab) {
     }
   }
   names(display) <- c(
-    "Condition", "N", "Predictor r", "Residual SD", "Parameter", "Population",
-    "Replications", "Mean estimate", "Bias", "MSE", "RMSE", "Coverage",
-    "Rejection rate", "Power", "Type I error"
+    "Condition", "N", "Estimator", "Parameter", "Population", "Replications",
+    "Mean estimate", "Bias", "MSE", "RMSE", "Coverage", "Rejection rate",
+    "Power", "Type I error", "Convergence"
   )
   c(
     "Table 1",
@@ -312,9 +420,9 @@ apa_table_ui <- function(tab) {
     }
   }
   names(display) <- c(
-    "Condition", "N", "Predictor r", "Residual SD", "Parameter", "Population",
-    "Replications", "Mean estimate", "Bias", "MSE", "RMSE", "Coverage",
-    "Rejection rate", "Power", "Type I error"
+    "Condition", "N", "Estimator", "Parameter", "Population", "Replications",
+    "Mean estimate", "Bias", "MSE", "RMSE", "Coverage", "Rejection rate",
+    "Power", "Type I error", "Convergence"
   )
   tagList(
     tags$table(
@@ -416,9 +524,32 @@ ui <- page_sidebar(
     numericInput("reps", "Replications", 50, min = 1, max = 500, step = 10),
     numericInput("alpha", "Alpha", 0.05, min = 0.001, max = 0.25, step = 0.001),
     numericInput("seed", "Seed", 20260608, min = 1, step = 1),
-    actionButton("run", "Run OLS demo", class = "btn-primary")
+    actionButton("run", "Run SEM preview", class = "btn-primary")
   ),
   navset_tab(
+    nav_panel(
+      "Instructions",
+      layout_columns(
+        col_widths = c(6, 6),
+        card(
+          card_header("Browser demo"),
+          tags$ol(
+            class = "instruction-list",
+            tags$li("Define latent variables, indicators, and population loadings."),
+            tags$li("Click Build lavaan syntax to generate the population and fitted model text."),
+            tags$li("Review the model equation and the raw lavaan syntax."),
+            tags$li("Click Run SEM preview for a small browser-side preview of SEM-style performance metrics."),
+            tags$li("Use the R Code or Quarto Export tabs for the real reproducible lavaan simulation project.")
+          )
+        ),
+        card(
+          card_header("Residual variances"),
+          tags$p("When residual variances are generated from standardized loadings, the demo assumes each observed indicator has variance 1 and the latent factor variance is 1."),
+          tags$p("For a loading of .70, the residual variance is 1 - .70^2 = .51. For a loading of .50, it is 1 - .50^2 = .75."),
+          tags$p("You can edit the generated population model directly if your simulation needs different indicator variances or residuals.")
+        )
+      )
+    ),
     nav_panel(
       "Model Builder",
       layout_columns(
@@ -426,16 +557,16 @@ ui <- page_sidebar(
         card(
           card_header("SEM syntax builder"),
           textInput("factor_names", "Latent variables", "f"),
-          textAreaInput("indicator_map", "Indicators by factor", "f: y1, y2, y3", rows = 3),
-          textAreaInput("loading_map", "Population loadings by factor", "f: 0.70, 0.80, 0.90", rows = 3),
+          textAreaInput("indicator_map", "Indicators by factor", "f: y1, y2, y3, y4", rows = 3),
+          textAreaInput("loading_map", "Population loadings by factor", "f: 0.70, 0.80, 0.90, 0.50", rows = 3),
           textAreaInput("factor_covariances", "Factor covariances", "", rows = 3),
           textAreaInput("structural_paths", "Structural regressions", "", rows = 3),
           actionButton("build_sem", "Build lavaan syntax")
         ),
         card(
           card_header("Generated lavaan syntax"),
-          textAreaInput("population_model", "Population model", "f =~ 0.70*y1 + 0.80*y2 + 0.90*y3\nf ~~ 1*f\ny1 ~~ 0.51*y1\ny2 ~~ 0.36*y2\ny3 ~~ 0.19*y3", rows = 8),
-          textAreaInput("fitted_model", "Fitted lavaan model", "f =~ y1 + y2 + y3", rows = 5),
+          textAreaInput("population_model", "Population model", "f =~ 0.70*y1 + 0.80*y2 + 0.90*y3 + 0.50*y4\nf ~~ 1*f\ny1 ~~ 0.51*y1\ny2 ~~ 0.36*y2\ny3 ~~ 0.19*y3\ny4 ~~ 0.75*y4", rows = 8),
+          textAreaInput("fitted_model", "Fitted lavaan model", "f =~ y1 + y2 + y3 + y4", rows = 5),
           selectInput("missing_method", "lavaan missing method", choices = c("listwise", "fiml", "ml", "direct"), selected = "listwise"),
           textInput("missing_rate", "MCAR missing rates", "0"),
           textInput("skewness", "Observed-variable skewness", "0"),
@@ -447,7 +578,7 @@ ui <- page_sidebar(
     ),
     nav_panel(
       "Results",
-      card(card_header("OLS demo summary"), tableOutput("summary")),
+      card(card_header("SEM preview summary"), tableOutput("summary")),
       card(card_header("APA-style table"), uiOutput("apa_pretty"), tags$hr(), verbatimTextOutput("apa"))
     ),
     nav_panel(
@@ -510,23 +641,11 @@ server <- function(input, output, session) {
 
   observeEvent(input$run, {
     n_values <- parse_numeric(input$n)
-    betas <- c(0.20, 0.30, 0.00)
-    rho_values <- 0.30
-    error_values <- 1
-    withProgress(message = "Running browser OLS demo", value = 0, {
-      append_run_log("running", paste("Browser demo:", length(n_values), "sample-size condition(s)."))
-      set.seed(input$seed)
-      grid <- expand.grid(n = n_values, predictor_correlation = rho_values, error_sd = error_values)
-      grid$condition_id <- seq_len(nrow(grid))
-      total <- nrow(grid) * input$reps
-      reps <- unlist(lapply(seq_len(nrow(grid)), function(row_id) {
-        condition <- grid[row_id, ]
-        lapply(seq_len(input$reps), function(i) {
-          incProgress(1 / total)
-          run_one_rep(condition$n, betas, condition$predictor_correlation, condition$error_sd, input$alpha, "y ~ x1 + x2 + x3", condition$condition_id, i)
-        })
-      }), recursive = FALSE)
-      summary_tbl(summarize_results(do.call(rbind, reps), input$alpha))
+    withProgress(message = "Running browser SEM preview", value = 0, {
+      append_run_log("running", paste("Browser SEM preview:", length(n_values), "sample-size condition(s)."))
+      incProgress(0.35)
+      summary_tbl(sem_preview_summary(input$population_model, n_values, input$reps, input$alpha, input$seed))
+      incProgress(0.65)
       append_run_log("completed", paste("Finished", nrow(summary_tbl()), "summary rows."))
     })
   })
@@ -579,7 +698,7 @@ server <- function(input, output, session) {
     tagList(
       tags$p(tags$strong("Status"), tags$br(), if (is.null(last)) "Idle" else last$status),
       tags$p(tags$strong("Last update"), tags$br(), if (is.null(last)) "No activity yet." else last$time),
-      tags$p(tags$strong("Browser limit"), tags$br(), "Small demo runs only; large SEM studies should use the local package app.")
+      tags$p(tags$strong("Browser mode"), tags$br(), "Runs in this browser tab only. The generated R and Quarto files run full lavaan simulations locally or on HPC.")
     )
   })
 

@@ -281,6 +281,10 @@ pre, .shiny-text-output, .shiny-bound-output pre {
 body.mc-dark code, body.mc-dark pre {
   color: #FFE7E2 !important;
 }
+.card, .card p, .card strong, .card span, .card-body, .card-body div, .shiny-html-output,
+.shiny-bound-output, .shiny-bound-output p, .shiny-bound-output strong {
+  color: var(--mc-text) !important;
+}
 .table, table {
   color: var(--mc-text);
 }
@@ -298,6 +302,17 @@ mjx-container, mjx-container * {
 }
 body.mc-dark mjx-container, body.mc-dark mjx-container * {
   color: #FFE7E2 !important;
+}
+mjx-container svg, mjx-container svg * {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+.instruction-list {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+.instruction-list li {
+  margin-bottom: .55rem;
 }
 "
 
@@ -385,8 +400,8 @@ build_sem_syntax <- function(factor_names,
   )
 }
 
-default_population <- "f =~ 0.70*y1 + 0.80*y2 + 0.90*y3\nf ~~ 1*f\ny1 ~~ 0.51*y1\ny2 ~~ 0.36*y2\ny3 ~~ 0.19*y3"
-default_fitted <- "f =~ y1 + y2 + y3"
+default_population <- "f =~ 0.70*y1 + 0.80*y2 + 0.90*y3 + 0.50*y4\nf ~~ 1*f\ny1 ~~ 0.51*y1\ny2 ~~ 0.36*y2\ny3 ~~ 0.19*y3\ny4 ~~ 0.75*y4"
+default_fitted <- "f =~ y1 + y2 + y3 + y4"
 default_parameter_conditions <- "f =~ y2: 0.60, 0.80\nf ~~ f: 0.80, 1.00"
 bollen_population <- "
 ind60 =~ 1*x1 + 2.180*x2 + 1.819*x3
@@ -448,6 +463,30 @@ ui <- page_sidebar(
   ),
   navset_tab(
     nav_panel(
+      "Instructions",
+      layout_columns(
+        col_widths = c(6, 6),
+        card(
+          card_header("SEM workflow"),
+          tags$ol(
+            class = "instruction-list",
+            tags$li("Choose lavaan SEM in the sidebar."),
+            tags$li("Enter latent variables, indicators, and population loadings, or load the Political Democracy example."),
+            tags$li("Click Build lavaan syntax to generate editable population and fitted lavaan syntax."),
+            tags$li("Set sample sizes, replications, seed, missingness, nonnormality, and parameter conditions."),
+            tags$li("Choose workers and a checkpoint directory, then click Run simulation."),
+            tags$li("Review results, figures, generated R code, and the Quarto export.")
+          )
+        ),
+        card(
+          card_header("Residual variances"),
+          tags$p("When residual variances are generated from standardized loadings, the app assumes each observed indicator has variance 1 and the latent factor variance is 1."),
+          tags$p("For a loading of .70, the residual variance is 1 - .70^2 = .51. For a loading of .50, it is 1 - .50^2 = .75."),
+          tags$p("Edit the population model directly when your simulation requires different residual variances, correlated residuals, or nonstandardized indicators.")
+        )
+      )
+    ),
+    nav_panel(
       "Model Builder",
       layout_columns(
         col_widths = c(4, 8),
@@ -456,8 +495,8 @@ ui <- page_sidebar(
           conditionalPanel(
             "input.simulation_type == 'sem'",
             textInput("factor_names", "Latent variables", "f"),
-            textAreaInput("indicator_map", "Indicators by factor", "f: y1, y2, y3", rows = 3),
-            textAreaInput("loading_map", "Population loadings by factor", "f: 0.70, 0.80, 0.90", rows = 3),
+            textAreaInput("indicator_map", "Indicators by factor", "f: y1, y2, y3, y4", rows = 3),
+            textAreaInput("loading_map", "Population loadings by factor", "f: 0.70, 0.80, 0.90, 0.50", rows = 3),
             textAreaInput("factor_covariances", "Factor covariances", "", rows = 3),
             textAreaInput("structural_paths", "Structural regressions", "", rows = 3),
             checkboxInput("include_residuals", "Compute residual variances from standardized loadings", TRUE),
