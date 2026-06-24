@@ -38,36 +38,51 @@ condition grid across the loading, factor variance, and residual variance.
 
 ## Add missingness and nonnormality factors
 
-`sem_sim_spec()` can also cross lavaan parameter conditions with MCAR missing
-rates and nonnormality settings. Missing values are imposed after data
-generation, so use an appropriate lavaan missing-data option such as FIML when
-the design includes missingness.
+`sem_sim_spec()` can also cross lavaan parameter conditions with missing-data
+rates, missing-data mechanisms, and nonnormality settings. Missing values are
+imposed after data generation, so use an appropriate lavaan missing-data option
+such as FIML when the design includes missingness.
+
+Supported missing-data mechanisms are:
+
+- `none`: do not impose missing values even when crossing placeholder conditions;
+- `mcar`: missing completely at random for the target variables;
+- `mar`: missingness in target variables depends on a separate observed driver;
+- `mnar`: missingness in each target variable depends on that variable's own value.
+
+The preset catalog is a quick way to start from common SEM templates:
+
+```{r, eval = FALSE}
+sem_model_presets()
+preset <- sem_model_preset("latent_mediation")
+```
 
 ## Build the simulation specification
 
 ```{r, eval = FALSE}
-population_model <- "
-f =~ 0.70*y1 + 0.80*y2 + 0.90*y3
-f ~~ 1*f
-y1 ~~ 0.51*y1
-y2 ~~ 0.36*y2
-y3 ~~ 0.19*y3
-"
+preset <- sem_model_preset("latent_mediation")
 
 spec <- sem_sim_spec(
-  population_model = population_model,
-  fitted_model = "f =~ y1 + y2 + y3",
+  population_model = preset$population_model,
+  fitted_model = preset$fitted_model,
   n = c(100, 250, 500),
   reps = 1000,
-  parameter_conditions = pc,
+  parameter_conditions = preset$parameter_conditions,
   missing = "fiml",
   missing_rate = c(0, 0.10, 0.20),
+  missing_mechanism = c("mcar", "mar", "mnar"),
+  missing_targets = c("m1", "m2", "m3", "y1", "y2", "y3"),
+  missing_driver = "x1",
+  missing_slope = 1,
   skewness = c(0, 1),
   kurtosis = c(0, 2),
   seed = 20260608
 )
 
 sem_condition_grid(spec)
+sem_model_parameters(preset$population_model)
+sem_design_summary(spec)
+sem_design_warnings(spec)
 ```
 
 ## Run with checkpoints
@@ -82,6 +97,6 @@ study <- run_simulation_study(
 )
 ```
 
-The summary includes the parameter-condition label, missing rate, skewness, and
-kurtosis so APA-style tables and plots can be interpreted by condition, not only
-by numeric condition id.
+The summary includes the parameter-condition label, missing rate, missing-data
+mechanism, skewness, and kurtosis so APA-style tables and plots can be
+interpreted by condition, not only by numeric condition id.

@@ -24,7 +24,14 @@ run_sem_replication <- function(spec, condition, rep_id) {
   if (inherits(dat, "error")) {
     return(sem_error_row(spec, condition, rep_id, conditionMessage(dat)))
   }
-  dat <- apply_mcar_missing(dat, condition$missing_rate)
+  dat <- apply_sem_missing(
+    dat = dat,
+    rate = condition$missing_rate,
+    mechanism = condition$missing_mechanism,
+    targets = spec$missing_targets,
+    driver = spec$missing_driver,
+    slope = spec$missing_slope
+  )
 
   fit <- tryCatch(
     lavaan::sem(
@@ -59,6 +66,7 @@ run_sem_replication <- function(spec, condition, rep_id) {
     n = condition$n,
     estimator = condition$estimator,
     missing_rate = condition$missing_rate,
+    missing_mechanism = condition$missing_mechanism,
     skewness = condition$skewness,
     kurtosis = condition$kurtosis,
     parameter_conditions = condition$parameter_conditions,
@@ -103,7 +111,8 @@ run_sem_condition <- function(spec, condition, workers = 1L) {
         "sem_improper_solution", "validate_sem_spec",
         "apply_sem_parameter_conditions", "normalize_sem_parameter_conditions",
         "sem_parameter_conditions", "sem_condition_column_names",
-        "apply_mcar_missing", "sem_moment_arg"
+        "apply_mcar_missing", "apply_sem_missing", "resolve_missing_targets",
+        "missing_probabilities", "standardize_for_missing", "sem_moment_arg"
       ),
       envir = environment()
     )
@@ -195,18 +204,105 @@ sem_moment_arg <- function(x) {
 }
 
 apply_mcar_missing <- function(dat, rate) {
+  apply_sem_missing(dat = dat, rate = rate, mechanism = "mcar")
+}
+
+apply_sem_missing <- function(dat,
+                              rate,
+                              mechanism = "mcar",
+                              targets = NULL,
+                              driver = NULL,
+                              slope = 1) {
   rate <- as.numeric(rate)[1L]
   if (is.na(rate) || rate <= 0) {
     return(dat)
   }
-  mask <- matrix(
-    stats::runif(nrow(dat) * ncol(dat)) < rate,
-    nrow = nrow(dat),
-    ncol = ncol(dat)
-  )
+  mechanism <- match.arg(tolower(mechanism), c("none", "mcar", "mar", "mnar"))
+  if (identical(mechanism, "none")) {
+    return(dat)
+  }
+
+  resolved <- resolve_missing_targets(dat, targets = targets, driver = driver, mechanism = mechanism)
+  target_names <- resolved$targets
+  if (!length(target_names)) {
+    return(dat)
+  }
+
   out <- dat
-  out[mask] <- NA
+  if (identical(mechanism, "mcar")) {
+    mask <- matrix(
+      stats::runif(nrow(out) * length(target_names)) < rate,
+      nrow = nrow(out),
+      ncol = length(target_names)
+    )
+    for (j in seq_along(target_names)) {
+      out[[target_names[[j]]]][mask[, j]] <- NA
+    }
+    return(out)
+  }
+
+  if (identical(mechanism, "mar")) {
+    z <- standardize_for_missing(out[[resolved$driver]])
+    probs <- missing_probabilities(z, rate = rate, slope = slope)
+    for (target in target_names) {
+      out[[target]][stats::runif(nrow(out)) < probs] <- NA
+    }
+    return(out)
+  }
+
+  for (target in target_names) {
+    z <- standardize_for_missing(out[[target]])
+    probs <- missing_probabilities(z, rate = rate, slope = slope)
+    out[[target]][stats::runif(nrow(out)) < probs] <- NA
+  }
   out
+}
+
+resolve_missing_targets <- function(dat, targets = NULL, driver = NULL, mechanism = "mcar") {
+  vars <- names(dat)
+  if (is.null(vars)) {
+    stop("Generated data must have column names for missing-data mechanisms.", call. = FALSE)
+  }
+
+  if (is.null(targets) || !length(targets) || identical(targets, "")) {
+    targets <- if (identical(mechanism, "mar") && length(vars) > 1L) vars[-1L] else vars
+  }
+  targets <- intersect(as.character(targets), vars)
+
+  if (is.null(driver) || !nzchar(driver)) {
+    driver <- setdiff(vars, targets)[1L]
+    if (is.na(driver)) {
+      driver <- vars[1L]
+    }
+  }
+  if (!driver %in% vars) {
+    stop("Missing-data driver not found in generated data: ", driver, call. = FALSE)
+  }
+
+  list(targets = targets, driver = driver)
+}
+
+standardize_for_missing <- function(x) {
+  x <- as.numeric(x)
+  s <- stats::sd(x, na.rm = TRUE)
+  if (!is.finite(s) || s == 0) {
+    return(rep(0, length(x)))
+  }
+  as.numeric((x - mean(x, na.rm = TRUE)) / s)
+}
+
+missing_probabilities <- function(z, rate, slope = 1) {
+  rate <- min(max(as.numeric(rate)[1L], 1e-6), 1 - 1e-6)
+  slope <- as.numeric(slope)[1L]
+  if (!is.finite(slope)) {
+    slope <- 1
+  }
+  objective <- function(intercept) mean(stats::plogis(intercept + slope * z), na.rm = TRUE) - rate
+  intercept <- tryCatch(
+    stats::uniroot(objective, lower = -30, upper = 30)$root,
+    error = function(e) stats::qlogis(rate)
+  )
+  stats::plogis(intercept + slope * z)
 }
 
 sem_error_row <- function(spec, condition, rep_id, error, converged = FALSE) {
@@ -215,6 +311,7 @@ sem_error_row <- function(spec, condition, rep_id, error, converged = FALSE) {
     n = condition$n,
     estimator = condition$estimator,
     missing_rate = condition$missing_rate,
+    missing_mechanism = condition$missing_mechanism,
     skewness = condition$skewness,
     kurtosis = condition$kurtosis,
     parameter_conditions = condition$parameter_conditions,

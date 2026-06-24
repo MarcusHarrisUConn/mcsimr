@@ -12,9 +12,9 @@ the primary target audience.
 The project now starts from `lavaan`: users can define a population model,
 define a fitted model, set sample-size and estimator conditions, choose the
 number of replications and seed, vary population parameters, impose MCAR
-missingness, request nonnormal generated data, run across local cores, and
-export APA-style tables, figures, model equations, raw LaTeX, and a
-reproducible Quarto project.
+missingness, MAR missingness, MNAR missingness, request nonnormal generated
+data, run across local cores, and export APA-style tables, figures, model
+equations, raw LaTeX, and a reproducible Quarto project.
 OLS regression remains available as a special case and as a simpler first
 engine.
 
@@ -69,40 +69,33 @@ remotes::install_github("MarcusHarrisUConn/mcsimr")
 ```r
 library(mcsimr)
 
-population_model <- "
-f =~ 0.70*y1 + 0.80*y2 + 0.90*y3
-f ~~ 1*f
-y1 ~~ 0.51*y1
-y2 ~~ 0.36*y2
-y3 ~~ 0.19*y3
-"
+preset <- sem_model_preset("latent_mediation")
 
-fitted_model <- "
-f =~ y1 + y2 + y3
-"
-
-parameter_conditions <- sem_parameter_conditions(
-  lhs = c("f", "f"),
-  op = c("=~", "~~"),
-  rhs = c("y2", "f"),
-  values = list(c(0.60, 0.80), c(0.80, 1.00))
-)
+sem_model_presets()
 
 spec <- sem_sim_spec(
-  population_model = population_model,
-  fitted_model = fitted_model,
+  population_model = preset$population_model,
+  fitted_model = preset$fitted_model,
   n = c(100, 250, 500),
   reps = 1000,
   estimator = c("ML"),
-  parameter_conditions = parameter_conditions,
+  parameter_conditions = preset$parameter_conditions,
   missing = "fiml",
   missing_rate = c(0, 0.10),
+  missing_mechanism = c("mcar", "mar", "mnar"),
+  missing_targets = c("m1", "m2", "m3", "y1", "y2", "y3"),
+  missing_driver = "x1",
+  missing_slope = 1,
   skewness = c(0, 1),
   kurtosis = c(0, 2),
   std_lv = TRUE,
   alpha = 0.05,
   seed = 20260608
 )
+
+sem_model_parameters(preset$population_model)
+sem_design_summary(spec)
+sem_design_warnings(spec)
 
 study <- run_simulation_study(
   spec,
@@ -174,11 +167,11 @@ The local app is the right place for larger runs because it uses the package
 engine and can write checkpoints to disk. It now uses a tabbed workflow:
 
 - **Model Builder**: build lavaan SEM syntax from latent variables, indicators,
-  loadings, covariances, and structural paths, or edit raw lavaan syntax. SEM
-  users can vary lavaan population parameters across conditions using parameter
-  rows such as `f =~ y2: 0.60, 0.80` or `dem65 ~ dem60: 0.65, 0.85`, and can
-  cross those factors with sample size, estimator, MCAR missing rates, skewness,
-  and excess kurtosis.
+  loadings, covariances, structural paths, or SEM presets, then edit raw lavaan
+  syntax. SEM users can vary lavaan population parameters across conditions
+  using parameter rows such as `f =~ y2: 0.60, 0.80` or
+  `dem65 ~ dem60: 0.65, 0.85`, and can cross those factors with sample size,
+  estimator, MCAR/MAR/MNAR missingness, skewness, and excess kurtosis.
 - **Results**: inspect simulation summaries and APA-style tables.
 - **Visualizations**: plot metrics such as bias, RMSE, coverage, power, Type I
   error, and SEM fit indices.
@@ -250,6 +243,7 @@ the Social Sciences*. A simulation should document:
 12. conclusions tied back to the motivating question.
 
 See [`docs/design.md`](docs/design.md) for the platform plan.
+See [`docs/roadmap.md`](docs/roadmap.md) for the current high-impact SEM workbench roadmap.
 
 ## Roadmap
 
@@ -277,6 +271,7 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 - [ ] Batch-size controls for very large replication counts
 - [x] Generic lavaan parameter condition grid
 - [x] Bollen Political Democracy example preset
+- [x] SEM preset catalog for CFA, structural regression, mediation, growth, and Bollen examples
 - [x] First visual condition editor for SEM parameter conditions
 - [ ] Saved condition presets
 - [ ] More APA table layouts for parameter-level and condition-level summaries
@@ -298,8 +293,8 @@ See [`docs/design.md`](docs/design.md) for the platform plan.
 - [x] loadings, factor variances, regressions, covariances, and residuals as
   condition factors through lavaan parameter conditions
 - [x] MCAR missing-data rate conditions
+- [x] MAR and MNAR missing-data mechanisms with target and driver controls
 - [x] Nonnormality conditions through lavaan skewness and excess kurtosis
-- [ ] MAR/MNAR missing-data templates
 - [ ] model misspecification templates
 - [ ] multi-group SEM templates
 

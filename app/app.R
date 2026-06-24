@@ -140,6 +140,25 @@ mjx-container svg, mjx-container svg * {
 .instruction-list li {
   margin-bottom: .55rem;
 }
+.condition-preview {
+  max-height: 280px;
+  overflow: auto;
+}
+.design-alert {
+  border: 1px solid var(--mc-border);
+  border-left-width: 5px;
+  border-radius: 8px;
+  padding: .7rem .85rem;
+  margin-top: .7rem;
+  background: rgba(255, 255, 255, .45);
+  color: var(--mc-text);
+}
+body.mc-dark .design-alert {
+  background: rgba(255, 255, 255, .05);
+}
+.design-alert-ok { border-left-color: #2F855A; }
+.design-alert-info { border-left-color: #B7791F; }
+.design-alert-warning { border-left-color: #F25C54; }
 "
 
 app_script <- "
@@ -153,7 +172,28 @@ $(document).on('change', '#theme_dark', function() {
 "
 
 split_csv <- function(x) {
-  trimws(strsplit(x, ",", fixed = TRUE)[[1]])
+  vals <- trimws(unlist(strsplit(as.character(x), ",", fixed = TRUE)))
+  vals[nzchar(vals)]
+}
+
+parse_character <- function(x) {
+  split_csv(x)
+}
+
+parse_optional_character <- function(x) {
+  vals <- split_csv(x)
+  vals <- vals[nzchar(vals)]
+  if (!length(vals)) {
+    return(NULL)
+  }
+  vals
+}
+
+r_character_vector_or_null <- function(x) {
+  if (is.null(x) || !length(x)) {
+    return("NULL")
+  }
+  paste0("c(", paste(sprintf('"%s"', x), collapse = ", "), ")")
 }
 
 parse_named_lines <- function(x) {
@@ -390,6 +430,74 @@ sem_preview_summary <- function(population_model, n_values, reps, alpha, seed) {
   do.call(rbind, rows)
 }
 
+preview_condition_grid <- function(n, missing_rate, missing_mechanism, skewness, kurtosis) {
+  grid <- expand.grid(
+    n = parse_numeric(n),
+    missing_rate = parse_numeric(missing_rate),
+    missing_mechanism = parse_character(missing_mechanism),
+    skewness = parse_numeric(skewness),
+    kurtosis = parse_numeric(kurtosis),
+    KEEP.OUT.ATTRS = FALSE,
+    stringsAsFactors = FALSE
+  )
+  grid$condition_id <- seq_len(nrow(grid))
+  grid[c("condition_id", "n", "missing_rate", "missing_mechanism", "skewness", "kurtosis")]
+}
+
+preview_design_summary <- function(n, reps, missing_rate, missing_mechanism, skewness, kurtosis) {
+  grid <- preview_condition_grid(n, missing_rate, missing_mechanism, skewness, kurtosis)
+  data.frame(
+    factor = c(
+      "Sample sizes",
+      "Missing rates",
+      "Missing mechanisms",
+      "Skewness values",
+      "Kurtosis values",
+      "Preview conditions",
+      "Preview model fits"
+    ),
+    levels = c(
+      length(parse_numeric(n)),
+      length(parse_numeric(missing_rate)),
+      length(parse_character(missing_mechanism)),
+      length(parse_numeric(skewness)),
+      length(parse_numeric(kurtosis)),
+      nrow(grid),
+      nrow(grid) * reps
+    ),
+    values = c(
+      paste(parse_numeric(n), collapse = ", "),
+      paste(parse_numeric(missing_rate), collapse = ", "),
+      paste(parse_character(missing_mechanism), collapse = ", "),
+      paste(parse_numeric(skewness), collapse = ", "),
+      paste(parse_numeric(kurtosis), collapse = ", "),
+      as.character(nrow(grid)),
+      as.character(nrow(grid) * reps)
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+preview_design_warnings <- function(n, reps, missing_rate, missing_method) {
+  grid <- preview_condition_grid(n, missing_rate, "mcar", 0, 0)
+  messages <- list()
+  add_message <- function(level, message) {
+    messages[[length(messages) + 1L]] <<- data.frame(level = level, message = message, stringsAsFactors = FALSE)
+  }
+
+  add_message(
+    "info",
+    "This public page runs only a small browser-side SEM preview. Use the generated R or Quarto files for full lavaan simulations on your own machine or HPC."
+  )
+  if (nrow(grid) * reps > 500L) {
+    add_message("warning", "The browser preview is intentionally small; keep large designs in the local package app.")
+  }
+  if (any(parse_numeric(missing_rate) > 0) && identical(tolower(missing_method), "listwise")) {
+    add_message("warning", "Missingness is enabled while lavaan code uses listwise deletion. Consider FIML when appropriate.")
+  }
+  do.call(rbind, messages)
+}
+
 markdown_table <- function(tab) {
   display <- tab
   for (nm in names(display)) {
@@ -435,7 +543,9 @@ apa_table_ui <- function(tab) {
 }
 
 quarto_files <- function(population_model, fitted_model, n, reps, seed,
-                         missing_method, missing_rate, skewness, kurtosis) {
+                         missing_method, missing_rate, missing_mechanism,
+                         missing_targets, missing_driver, missing_slope,
+                         skewness, kurtosis) {
   run_r <- sprintf(
     paste(
       "library(mcsimr)",
@@ -451,6 +561,10 @@ quarto_files <- function(population_model, fitted_model, n, reps, seed,
       "  estimator = 'ML',",
       "  missing = %s,",
       "  missing_rate = c(%s),",
+      "  missing_mechanism = c(%s),",
+      "  missing_targets = %s,",
+      "  missing_driver = %s,",
+      "  missing_slope = %s,",
       "  skewness = c(%s),",
       "  kurtosis = c(%s),",
       "  seed = %s",
@@ -468,6 +582,10 @@ quarto_files <- function(population_model, fitted_model, n, reps, seed,
     reps,
     deparse(missing_method),
     paste(parse_numeric(missing_rate), collapse = ", "),
+    paste(sprintf('"%s"', parse_character(missing_mechanism)), collapse = ", "),
+    r_character_vector_or_null(parse_optional_character(missing_targets)),
+    r_character_vector_or_null(parse_optional_character(missing_driver)),
+    missing_slope,
     paste(parse_numeric(skewness), collapse = ", "),
     paste(parse_numeric(kurtosis), collapse = ", "),
     seed
@@ -505,6 +623,10 @@ quarto_files <- function(population_model, fitted_model, n, reps, seed,
       "estimator: ML",
       paste0("missing: ", missing_method),
       paste0("missing_rate: [", paste(parse_numeric(missing_rate), collapse = ", "), "]"),
+      paste0("missing_mechanism: [", paste(parse_character(missing_mechanism), collapse = ", "), "]"),
+      paste0("missing_targets: [", paste(parse_optional_character(missing_targets), collapse = ", "), "]"),
+      paste0("missing_driver: ", paste(parse_optional_character(missing_driver), collapse = ", ")),
+      paste0("missing_slope: ", missing_slope),
       paste0("skewness: [", paste(parse_numeric(skewness), collapse = ", "), "]"),
       paste0("kurtosis: [", paste(parse_numeric(kurtosis), collapse = ", "), "]"),
       sep = "\n"
@@ -538,6 +660,7 @@ ui <- page_sidebar(
             tags$li("Define latent variables, indicators, and population loadings."),
             tags$li("Click Build lavaan syntax to generate the population and fitted model text."),
             tags$li("Review the model equation and the raw lavaan syntax."),
+            tags$li("Set missingness and nonnormality options for the reproducible lavaan code."),
             tags$li("Click Run SEM preview for a small browser-side preview of SEM-style performance metrics."),
             tags$li("Use the R Code or Quarto Export tabs for the real reproducible lavaan simulation project.")
           )
@@ -568,7 +691,17 @@ ui <- page_sidebar(
           textAreaInput("population_model", "Population model", "f =~ 0.70*y1 + 0.80*y2 + 0.90*y3 + 0.50*y4\nf ~~ 1*f\ny1 ~~ 0.51*y1\ny2 ~~ 0.36*y2\ny3 ~~ 0.19*y3\ny4 ~~ 0.75*y4", rows = 8),
           textAreaInput("fitted_model", "Fitted lavaan model", "f =~ y1 + y2 + y3 + y4", rows = 5),
           selectInput("missing_method", "lavaan missing method", choices = c("listwise", "fiml", "ml", "direct"), selected = "listwise"),
-          textInput("missing_rate", "MCAR missing rates", "0"),
+          textInput("missing_rate", "Missing rates", "0"),
+          selectInput(
+            "missing_mechanism",
+            "Missing-data mechanism",
+            choices = c("MCAR" = "mcar", "MAR" = "mar", "MNAR" = "mnar", "None" = "none"),
+            selected = "mcar",
+            multiple = TRUE
+          ),
+          textInput("missing_targets", "Missing targets", ""),
+          textInput("missing_driver", "MAR driver", ""),
+          numericInput("missing_slope", "Missingness slope", 1, min = -5, max = 5, step = 0.1),
           textInput("skewness", "Observed-variable skewness", "0"),
           textInput("kurtosis", "Observed-variable excess kurtosis", "0"),
           uiOutput("equations"),
@@ -580,6 +713,25 @@ ui <- page_sidebar(
       "Results",
       card(card_header("SEM preview summary"), tableOutput("summary")),
       card(card_header("APA-style table"), uiOutput("apa_pretty"), tags$hr(), verbatimTextOutput("apa"))
+    ),
+    nav_panel(
+      "Conditions",
+      layout_columns(
+        col_widths = c(4, 8),
+        card(
+          card_header("Preview design"),
+          tableOutput("design_summary"),
+          uiOutput("design_warnings")
+        ),
+        card(
+          card_header("Population parameters detected"),
+          tags$div(class = "condition-preview", tableOutput("preview_parameters"))
+        ),
+        card(
+          card_header("Browser condition grid"),
+          tags$div(class = "condition-preview", tableOutput("condition_grid"))
+        )
+      )
     ),
     nav_panel(
       "Visualizations",
@@ -674,6 +826,35 @@ server <- function(input, output, session) {
     summary_tbl()
   }, striped = TRUE, bordered = TRUE, digits = 4)
 
+  output$design_summary <- renderTable({
+    preview_design_summary(
+      input$n,
+      input$reps,
+      input$missing_rate,
+      input$missing_mechanism,
+      input$skewness,
+      input$kurtosis
+    )
+  }, striped = TRUE, bordered = TRUE)
+
+  output$design_warnings <- renderUI({
+    notes <- preview_design_warnings(input$n, input$reps, input$missing_rate, input$missing_method)
+    tagList(lapply(seq_len(nrow(notes)), function(i) {
+      tags$div(
+        class = paste("design-alert", paste0("design-alert-", notes$level[[i]])),
+        notes$message[[i]]
+      )
+    }))
+  })
+
+  output$preview_parameters <- renderTable({
+    extract_sem_truth(input$population_model)
+  }, striped = TRUE, bordered = TRUE)
+
+  output$condition_grid <- renderTable({
+    preview_condition_grid(input$n, input$missing_rate, input$missing_mechanism, input$skewness, input$kurtosis)
+  }, striped = TRUE, bordered = TRUE)
+
   output$metric_plot <- renderPlot({
     req(summary_tbl())
     req(input$plot_metric %in% names(summary_tbl()))
@@ -705,14 +886,18 @@ server <- function(input, output, session) {
   output$code <- renderText({
     quarto_files(
       input$population_model, input$fitted_model, input$n, input$reps, input$seed,
-      input$missing_method, input$missing_rate, input$skewness, input$kurtosis
+      input$missing_method, input$missing_rate, input$missing_mechanism,
+      input$missing_targets, input$missing_driver, input$missing_slope,
+      input$skewness, input$kurtosis
     )[["run.R"]]
   })
 
   output$quarto_preview <- renderText({
     quarto_files(
       input$population_model, input$fitted_model, input$n, input$reps, input$seed,
-      input$missing_method, input$missing_rate, input$skewness, input$kurtosis
+      input$missing_method, input$missing_rate, input$missing_mechanism,
+      input$missing_targets, input$missing_driver, input$missing_slope,
+      input$skewness, input$kurtosis
     )[[input$quarto_file]]
   })
 
@@ -722,7 +907,9 @@ server <- function(input, output, session) {
       writeLines(
         quarto_files(
           input$population_model, input$fitted_model, input$n, input$reps, input$seed,
-          input$missing_method, input$missing_rate, input$skewness, input$kurtosis
+          input$missing_method, input$missing_rate, input$missing_mechanism,
+          input$missing_targets, input$missing_driver, input$missing_slope,
+          input$skewness, input$kurtosis
         )[[input$quarto_file]],
         file
       )
@@ -736,7 +923,9 @@ server <- function(input, output, session) {
       dir.create(tmp)
       files <- quarto_files(
         input$population_model, input$fitted_model, input$n, input$reps, input$seed,
-        input$missing_method, input$missing_rate, input$skewness, input$kurtosis
+        input$missing_method, input$missing_rate, input$missing_mechanism,
+        input$missing_targets, input$missing_driver, input$missing_slope,
+        input$skewness, input$kurtosis
       )
       for (nm in names(files)) {
         target <- file.path(tmp, nm)

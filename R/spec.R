@@ -78,6 +78,10 @@ sem_sim_spec <- function(population_model,
                          estimator = "ML",
                          parameter_conditions = NULL,
                          missing_rate = 0,
+                         missing_mechanism = "mcar",
+                         missing_targets = NULL,
+                         missing_driver = NULL,
+                         missing_slope = 1,
                          skewness = 0,
                          kurtosis = 0,
                          missing = "listwise",
@@ -93,6 +97,12 @@ sem_sim_spec <- function(population_model,
   stopifnot(reps >= 1L)
   stopifnot(alpha > 0, alpha < 1)
   stopifnot(length(missing_rate) >= 1L, all(missing_rate >= 0), all(missing_rate < 1))
+  stopifnot(length(missing_mechanism) >= 1L)
+  missing_mechanism <- match.arg(
+    tolower(missing_mechanism),
+    choices = c("none", "mcar", "mar", "mnar"),
+    several.ok = TRUE
+  )
   stopifnot(length(skewness) >= 1L)
   stopifnot(length(kurtosis) >= 1L)
   parameter_conditions <- normalize_sem_parameter_conditions(parameter_conditions)
@@ -108,6 +118,10 @@ sem_sim_spec <- function(population_model,
     estimator = as.character(estimator),
     parameter_conditions = parameter_conditions,
     missing_rate = as.numeric(missing_rate),
+    missing_mechanism = as.character(missing_mechanism),
+    missing_targets = if (is.null(missing_targets)) NULL else as.character(missing_targets),
+    missing_driver = if (is.null(missing_driver)) NULL else as.character(missing_driver)[1L],
+    missing_slope = as.numeric(missing_slope)[1L],
     skewness = as.numeric(skewness),
     kurtosis = as.numeric(kurtosis),
     missing = as.character(missing),
@@ -135,6 +149,7 @@ sem_condition_grid <- function(spec) {
     n = spec$n,
     estimator = spec$estimator,
     missing_rate = spec$missing_rate,
+    missing_mechanism = spec$missing_mechanism,
     skewness = spec$skewness,
     kurtosis = spec$kurtosis,
     KEEP.OUT.ATTRS = FALSE,
@@ -164,7 +179,8 @@ sem_condition_grid <- function(spec) {
 
   grid$condition_id <- seq_len(nrow(grid))
   grid[c(
-    "condition_id", "n", "estimator", "missing_rate", "skewness", "kurtosis",
+    "condition_id", "n", "estimator", "missing_rate", "missing_mechanism",
+    "skewness", "kurtosis",
     "parameter_conditions", sem_condition_column_names(parameter_conditions)
   )]
 }

@@ -7,11 +7,29 @@ parse_numeric <- function(x) {
 }
 
 parse_character <- function(x) {
-  trimws(strsplit(x, ",", fixed = TRUE)[[1L]])
+  vals <- trimws(unlist(strsplit(as.character(x), ",", fixed = TRUE)))
+  vals[nzchar(vals)]
 }
 
 split_csv <- function(x) {
-  trimws(strsplit(x, ",", fixed = TRUE)[[1L]])
+  vals <- trimws(unlist(strsplit(as.character(x), ",", fixed = TRUE)))
+  vals[nzchar(vals)]
+}
+
+parse_optional_character <- function(x) {
+  vals <- split_csv(x)
+  vals <- vals[nzchar(vals)]
+  if (!length(vals)) {
+    return(NULL)
+  }
+  vals
+}
+
+r_character_vector_or_null <- function(x) {
+  if (is.null(x) || !length(x)) {
+    return("NULL")
+  }
+  paste0("c(", paste(sprintf('"%s"', x), collapse = ", "), ")")
 }
 
 parse_named_lines <- function(x) {
@@ -65,6 +83,23 @@ parse_parameter_condition_lines <- function(x) {
 
 format_parameter_condition_line <- function(lhs, op, rhs, values) {
   paste0(trimws(lhs), " ", trimws(op), " ", trimws(rhs), ": ", paste(values, collapse = ", "))
+}
+
+format_parameter_conditions_for_app <- function(parameter_conditions) {
+  if (is.null(parameter_conditions) || !nrow(parameter_conditions)) {
+    return("")
+  }
+  paste(
+    vapply(seq_len(nrow(parameter_conditions)), function(i) {
+      format_parameter_condition_line(
+        parameter_conditions$lhs[[i]],
+        parameter_conditions$op[[i]],
+        parameter_conditions$rhs[[i]],
+        parameter_conditions$values[[i]]
+      )
+    }, character(1L)),
+    collapse = "\n"
+  )
 }
 
 strip_numeric_multipliers <- function(x) {
@@ -297,6 +332,30 @@ body.mc-dark code, body.mc-dark pre {
   max-height: 260px;
   overflow: auto;
 }
+.design-alert {
+  border: 1px solid var(--mc-border);
+  border-left-width: 5px;
+  border-radius: 8px;
+  padding: .7rem .85rem;
+  margin-top: .7rem;
+  background: rgba(255, 255, 255, .45);
+  color: var(--mc-text);
+}
+body.mc-dark .design-alert {
+  background: rgba(255, 255, 255, .05);
+}
+.design-alert-ok {
+  border-left-color: #2F855A;
+}
+.design-alert-info {
+  border-left-color: #B7791F;
+}
+.design-alert-warning {
+  border-left-color: var(--mc-accent-2);
+}
+.parameter-picker {
+  margin-bottom: .85rem;
+}
 mjx-container, mjx-container * {
   color: var(--mc-text) !important;
 }
@@ -494,6 +553,14 @@ ui <- page_sidebar(
           card_header("SEM builder"),
           conditionalPanel(
             "input.simulation_type == 'sem'",
+            selectInput(
+              "sem_preset",
+              "SEM preset",
+              choices = stats::setNames(sem_model_presets()$name, sem_model_presets()$title),
+              selected = "one_factor_cfa"
+            ),
+            actionButton("load_preset", "Load preset"),
+            tags$hr(),
             textInput("factor_names", "Latent variables", "f"),
             textAreaInput("indicator_map", "Indicators by factor", "f: y1, y2, y3, y4", rows = 3),
             textAreaInput("loading_map", "Population loadings by factor", "f: 0.70, 0.80, 0.90, 0.50", rows = 3),
@@ -530,7 +597,17 @@ ui <- page_sidebar(
             textAreaInput("fitted_model", "Fitted lavaan model", default_fitted, rows = 6),
             textInput("estimator", "Estimators", "ML"),
             selectInput("missing", "lavaan missing method", choices = c("listwise", "fiml", "ml", "direct"), selected = "listwise"),
-            textInput("missing_rate", "MCAR missing rates", "0"),
+            textInput("missing_rate", "Missing-data rates", "0"),
+            selectInput(
+              "missing_mechanism",
+              "Missing-data mechanism",
+              choices = c("MCAR" = "mcar", "MAR" = "mar", "MNAR" = "mnar", "None" = "none"),
+              selected = "mcar",
+              multiple = TRUE
+            ),
+            textInput("missing_targets", "Missing targets", ""),
+            textInput("missing_driver", "MAR driver", ""),
+            numericInput("missing_slope", "Missingness slope", 1, min = -5, max = 5, step = 0.1),
             textInput("skewness", "Observed-variable skewness", "0"),
             textInput("kurtosis", "Observed-variable excess kurtosis", "0"),
             checkboxInput("std_lv", "Use std.lv = TRUE", TRUE),
@@ -542,6 +619,32 @@ ui <- page_sidebar(
             tags$hr(),
             verbatimTextOutput("equations_raw")
           )
+        )
+      )
+    ),
+    nav_panel(
+      "Conditions",
+      layout_columns(
+        col_widths = c(4, 8),
+        card(
+          card_header("Design summary"),
+          tableOutput("design_summary"),
+          uiOutput("design_warnings")
+        ),
+        card(
+          card_header("Model parameters to vary"),
+          tags$div(class = "parameter-picker", uiOutput("candidate_parameter_ui")),
+          layout_columns(
+            col_widths = c(6, 6),
+            actionButton("use_candidate_parameter", "Use selected parameter"),
+            actionButton("add_candidate_condition", "Add selected condition")
+          ),
+          textInput("candidate_values", "Condition values for selected parameter", "0.50, 0.70, 0.90"),
+          tags$div(class = "condition-preview", tableOutput("parameter_catalog"))
+        ),
+        card(
+          card_header("Full condition grid"),
+          tags$div(class = "condition-preview", tableOutput("condition_grid_full"))
         )
       )
     ),
@@ -664,6 +767,33 @@ server <- function(input, output, session) {
     )
   })
 
+  load_sem_preset <- function(name) {
+    preset <- sem_model_preset(name)
+    updateTextAreaInput(session, "population_model", value = preset$population_model)
+    updateTextAreaInput(session, "fitted_model", value = preset$fitted_model)
+    updateTextAreaInput(session, "parameter_conditions", value = format_parameter_conditions_for_app(preset$parameter_conditions))
+    updateTextInput(session, "factor_names", value = preset$builder$factor_names)
+    updateTextAreaInput(session, "indicator_map", value = preset$builder$indicator_map)
+    updateTextAreaInput(session, "loading_map", value = preset$builder$loading_map)
+    updateTextAreaInput(session, "factor_covariances", value = preset$builder$factor_covariances)
+    updateTextAreaInput(session, "structural_paths", value = preset$builder$structural_paths)
+    if (!is.null(preset$parameter_conditions) && nrow(preset$parameter_conditions)) {
+      visual_conditions(data.frame(
+        lhs = preset$parameter_conditions$lhs,
+        op = preset$parameter_conditions$op,
+        rhs = preset$parameter_conditions$rhs,
+        values = vapply(preset$parameter_conditions$values, function(x) paste(x, collapse = ", "), character(1L)),
+        stringsAsFactors = FALSE
+      ))
+    } else {
+      visual_conditions(visual_conditions()[0, , drop = FALSE])
+    }
+  }
+
+  observeEvent(input$load_preset, {
+    load_sem_preset(input$sem_preset)
+  })
+
   observeEvent(input$build_sem, {
     syntax <- build_sem_syntax(
       factor_names = input$factor_names,
@@ -678,21 +808,8 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$load_bollen, {
-    updateTextAreaInput(session, "population_model", value = trimws(bollen_population))
-    updateTextAreaInput(session, "fitted_model", value = trimws(bollen_fitted))
-    updateTextAreaInput(session, "parameter_conditions", value = bollen_conditions)
-    updateTextInput(session, "factor_names", value = "ind60, dem60, dem65")
-    updateTextAreaInput(session, "indicator_map", value = "ind60: x1, x2, x3\ndem60: y1, y2, y3, y4\ndem65: y5, y6, y7, y8")
-    updateTextAreaInput(session, "loading_map", value = "ind60: 1, 2.180, 1.819\ndem60: 1, 1.257, 1.058, 1.265\ndem65: 1, 1.186, 1.280, 1.266")
-    updateTextAreaInput(session, "factor_covariances", value = "y1 ~~ 1.892*y5\ny2 ~~ 7.373*y4\ny2 ~~ 2.488*y6\ny3 ~~ 5.067*y7\ny4 ~~ 1.706*y8")
-    updateTextAreaInput(session, "structural_paths", value = "dem60 ~ 1.483*ind60\ndem65 ~ 0.572*ind60 + 0.837*dem60")
-    visual_conditions(data.frame(
-      lhs = c("dem65", "ind60", "dem60"),
-      op = c("~", "=~", "~~"),
-      rhs = c("dem60", "x2", "dem60"),
-      values = c("0.65, 0.85", "1.80, 2.20", "3.00, 4.00"),
-      stringsAsFactors = FALSE
-    ))
+    updateSelectInput(session, "sem_preset", selected = "bollen_political_democracy")
+    load_sem_preset("bollen_political_democracy")
   })
 
   observeEvent(input$add_condition, {
@@ -722,6 +839,94 @@ server <- function(input, output, session) {
     visual_conditions()
   }, striped = TRUE, bordered = TRUE)
 
+  candidate_parameters <- reactive({
+    if (!identical(input$simulation_type, "sem")) {
+      return(NULL)
+    }
+    tryCatch(
+      sem_model_parameters(input$population_model),
+      error = function(e) {
+        attr(e, "mcsimr_message") <- conditionMessage(e)
+        e
+      }
+    )
+  })
+
+  output$candidate_parameter_ui <- renderUI({
+    pars <- candidate_parameters()
+    if (inherits(pars, "error")) {
+      return(tags$p(attr(pars, "mcsimr_message")))
+    }
+    if (is.null(pars) || !nrow(pars)) {
+      return(tags$p("No lavaan parameters were parsed from the population model."))
+    }
+    keys <- paste(pars$lhs, pars$op, pars$rhs, sep = "|")
+    labels <- paste0(
+      pars$label,
+      ifelse(is.na(pars$value), "", paste0(" [", format(pars$value, trim = TRUE), "]"))
+    )
+    selectInput(
+      "candidate_parameter",
+      "Parameter",
+      choices = stats::setNames(keys, labels),
+      selected = keys[[1L]]
+    )
+  })
+
+  output$parameter_catalog <- renderTable({
+    pars <- candidate_parameters()
+    if (inherits(pars, "error")) {
+      return(data.frame(message = attr(pars, "mcsimr_message"), stringsAsFactors = FALSE))
+    }
+    if (is.null(pars) || !nrow(pars)) {
+      return(data.frame(message = "No parameters available.", stringsAsFactors = FALSE))
+    }
+    out <- pars
+    out$value <- ifelse(is.na(out$value), "", format(out$value, trim = TRUE))
+    out$free <- ifelse(out$free, "estimated", "fixed")
+    out[, c("label", "value", "free"), drop = FALSE]
+  }, striped = TRUE, bordered = TRUE)
+
+  use_selected_parameter <- function(values = NULL, add = FALSE) {
+    req(input$candidate_parameter)
+    parts <- strsplit(input$candidate_parameter, "|", fixed = TRUE)[[1L]]
+    if (length(parts) != 3L) {
+      return(invisible(FALSE))
+    }
+    updateTextInput(session, "condition_lhs", value = parts[[1L]])
+    updateSelectInput(session, "condition_op", selected = parts[[2L]])
+    updateTextInput(session, "condition_rhs", value = parts[[3L]])
+    if (!is.null(values)) {
+      updateTextInput(session, "condition_values", value = values)
+    }
+    if (isTRUE(add)) {
+      vals <- parse_numeric(values)
+      line <- format_parameter_condition_line(parts[[1L]], parts[[2L]], parts[[3L]], vals)
+      current <- trimws(input$parameter_conditions)
+      updated <- if (nzchar(current)) paste(current, line, sep = "\n") else line
+      updateTextAreaInput(session, "parameter_conditions", value = updated)
+      visual_conditions(rbind(
+        visual_conditions(),
+        data.frame(
+          lhs = parts[[1L]],
+          op = parts[[2L]],
+          rhs = parts[[3L]],
+          values = paste(vals, collapse = ", "),
+          stringsAsFactors = FALSE
+        )
+      ))
+    }
+    invisible(TRUE)
+  }
+
+  observeEvent(input$use_candidate_parameter, {
+    use_selected_parameter(values = input$candidate_values, add = FALSE)
+  })
+
+  observeEvent(input$add_candidate_condition, {
+    use_selected_parameter(values = input$candidate_values, add = TRUE)
+  })
+
   parameter_conditions <- reactive({
     if (!identical(input$simulation_type, "sem")) {
       return(NULL)
@@ -739,6 +944,10 @@ server <- function(input, output, session) {
         estimator = parse_character(input$estimator),
         parameter_conditions = parameter_conditions(),
         missing_rate = parse_numeric(input$missing_rate),
+        missing_mechanism = parse_character(input$missing_mechanism),
+        missing_targets = parse_optional_character(input$missing_targets),
+        missing_driver = parse_optional_character(input$missing_driver),
+        missing_slope = input$missing_slope,
         skewness = parse_numeric(input$skewness),
         kurtosis = parse_numeric(input$kurtosis),
         missing = input$missing,
@@ -769,9 +978,31 @@ server <- function(input, output, session) {
   output$condition_grid <- renderTable({
     req(identical(input$simulation_type, "sem"))
     sem_condition_grid(spec())[c(
-      "condition_id", "n", "estimator", "missing_rate", "skewness", "kurtosis",
+      "condition_id", "n", "estimator", "missing_rate", "missing_mechanism",
+      "skewness", "kurtosis",
       "parameter_conditions"
     )]
+  }, striped = TRUE, bordered = TRUE)
+
+  output$design_summary <- renderTable({
+    req(identical(input$simulation_type, "sem"))
+    sem_design_summary(spec())
+  }, striped = TRUE, bordered = TRUE)
+
+  output$design_warnings <- renderUI({
+    req(identical(input$simulation_type, "sem"))
+    notes <- sem_design_warnings(spec())
+    tagList(lapply(seq_len(nrow(notes)), function(i) {
+      tags$div(
+        class = paste("design-alert", paste0("design-alert-", notes$level[[i]])),
+        notes$message[[i]]
+      )
+    }))
+  })
+
+  output$condition_grid_full <- renderTable({
+    req(identical(input$simulation_type, "sem"))
+    sem_condition_grid(spec())
   }, striped = TRUE, bordered = TRUE)
 
   observeEvent(input$run, {
@@ -882,6 +1113,10 @@ server <- function(input, output, session) {
           "  estimator = c(%s),",
           "  missing = %s,",
           "  missing_rate = c(%s),",
+          "  missing_mechanism = c(%s),",
+          "  missing_targets = %s,",
+          "  missing_driver = %s,",
+          "  missing_slope = %s,",
           "  skewness = c(%s),",
           "  kurtosis = c(%s),",
           "  parameter_conditions = sem_parameter_conditions(",
@@ -915,6 +1150,10 @@ server <- function(input, output, session) {
         paste(sprintf('"%s"', parse_character(input$estimator)), collapse = ", "),
         deparse(input$missing),
         paste(parse_numeric(input$missing_rate), collapse = ", "),
+        paste(sprintf('"%s"', parse_character(input$missing_mechanism)), collapse = ", "),
+        r_character_vector_or_null(parse_optional_character(input$missing_targets)),
+        r_character_vector_or_null(parse_optional_character(input$missing_driver)),
+        input$missing_slope,
         paste(parse_numeric(input$skewness), collapse = ", "),
         paste(parse_numeric(input$kurtosis), collapse = ", "),
         paste(sprintf('"%s"', pc$lhs), collapse = ", "),

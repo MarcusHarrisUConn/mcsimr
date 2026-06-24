@@ -6,5 +6,8 @@
 - Added OLS simulation specifications with sample size, predictor correlation, residual SD, seed, replication count, checkpointing, parallel workers, and APA-style summaries.
 - Added lavaan SEM simulation specifications with population and fitted model syntax, estimator conditions, convergence/improper-solution summaries, fit indices, model-equation LaTeX, and Quarto export.
 - Added SEM parameter condition grids through `sem_parameter_conditions()`, allowing users to vary loadings, factor variances, residual variances/covariances, regressions, and intercepts across simulation conditions.
+- Added `sem_model_presets()` and `sem_model_preset()` with CFA, structural regression, mediation, growth, and Bollen political democracy starting points.
+- Added MCAR, MAR, and MNAR missing-data mechanisms with missing target, driver, and slope controls for SEM simulations.
+- Added SEM design-inspection helpers for extracting lavaan parameters, summarizing crossed condition grids, and warning users about large or fragile designs before long runs.
 - Added reproducible Quarto project export with serialized simulation specs, runnable code, APA table markdown, model equations, raw results, summaries, and figures.
 - Added a Shinylive browser demo and GitHub Pages deployment.
