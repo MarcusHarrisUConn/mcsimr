@@ -13,8 +13,10 @@ The project now starts from `lavaan`: users can define a population model,
 define a fitted model, set sample-size and estimator conditions, choose the
 number of replications and seed, vary population parameters, impose MCAR
 missingness, MAR missingness, MNAR missingness, request nonnormal generated
-data, run across local cores, and export APA-style tables, figures, model
-equations, raw LaTeX, and a reproducible Quarto project.
+data, define multiple-group SEM starters, apply fitted-model misspecification
+presets, run across local cores, validate the design, retry failed conditions,
+and export APA-style tables, figures, model equations, raw LaTeX, generated
+methods text, and a reproducible Quarto project.
 OLS regression remains available as a special case and as a simpler first
 engine.
 
@@ -96,6 +98,7 @@ spec <- sem_sim_spec(
 sem_model_parameters(preset$population_model)
 sem_design_summary(spec)
 sem_design_warnings(spec)
+validate_simulation_design(spec)
 
 study <- run_simulation_study(
   spec,
@@ -106,8 +109,53 @@ study <- run_simulation_study(
 )
 
 study$summary
+study$run_manifest
+cat(study$methods_text)
 cat(paste(study$equations_latex, collapse = "\n"))
 cat(paste(study$apa_tables$markdown, collapse = "\n"))
+```
+
+## SEM design features
+
+The SEM engine is intended to grow into a broad simulation-design workbench.
+The current API already supports cross-classified condition factors for sample
+size, estimator, missing-data rate and mechanism, nonnormality, and arbitrary
+lavaan population parameters. It also includes starter support for common
+reviewer-facing design choices:
+
+```r
+sem_misspecification_presets()
+
+spec <- sem_sim_spec(
+  population_model = preset$population_model,
+  fitted_model = preset$fitted_model,
+  n = c(100, 250),
+  reps = 500,
+  parameter_conditions = preset$parameter_conditions,
+  misspecification = "omit_structural_path",
+  group_variable = "condition",
+  group_labels = c("control", "treatment"),
+  group_proportions = c(.50, .50),
+  seed = 20260608
+)
+
+validate_simulation_design(spec)
+study <- run_simulation_study(spec, checkpoint_dir = "results/checkpoints/sem-demo")
+
+write_apa_html(study$apa_tables, "results/apa-table.html")
+write_apa_word(study$apa_tables, "results/apa-table.doc")
+cat(study$methods_text)
+```
+
+If a long run fails partway through, failed manifest rows can be retried without
+rerunning completed conditions:
+
+```r
+retry_failed_conditions(
+  spec,
+  checkpoint_dir = "results/checkpoints/sem-demo",
+  workers = 4
+)
 ```
 
 ## Run an OLS simulation
@@ -136,6 +184,7 @@ study <- run_simulation_study(
 )
 
 study$summary
+study$run_manifest
 cat(paste(study$apa_tables$markdown, collapse = "\n"))
 ```
 
@@ -175,14 +224,20 @@ engine and can write checkpoints to disk. It now uses a tabbed workflow:
 - **Results**: inspect simulation summaries and APA-style tables.
 - **Visualizations**: plot metrics such as bias, RMSE, coverage, power, Type I
   error, and SEM fit indices.
-- **Run Dashboard**: monitor queued, running, completed, and exported actions
-  while checkpoints accumulate on disk.
+- **Run Dashboard**: monitor queued, running, completed, resumed, and failed
+  conditions from the persistent run manifest while checkpoints accumulate on
+  disk.
 - **R Code**: copy the fully reproducible code generated from the current setup.
 - **Quarto Export**: write a runnable Quarto project with code, tables, figures,
   rendered equations, and raw LaTeX.
 
 For simulations that may run for days or weeks, use checkpoint directories and
-rerun with `resume = TRUE`.
+rerun with `resume = TRUE`. Each checkpoint directory now includes
+`run-manifest.csv`, which can be read with `read_run_manifest()`:
+
+```r
+read_run_manifest("results/checkpoints/sem-demo")
+```
 
 ## Export a reproducible Quarto project
 
@@ -203,7 +258,9 @@ The exported project contains:
 - `run.R`;
 - an `R/` helper folder;
 - a `results/` folder for raw results, metric summaries, APA-style table
-  markdown, raw LaTeX model equations, and figures.
+  markdown, the run manifest, raw LaTeX model equations, and figures.
+  The main run script also writes APA HTML/Word-ready tables and generated
+  methods text.
 
 The goal is that an app-launched simulation never stays trapped inside the app.
 It should become a transparent, rerunnable research artifact.
@@ -266,8 +323,8 @@ See [`docs/roadmap.md`](docs/roadmap.md) for the current high-impact SEM workben
 
 - [ ] Background job launcher from Shiny
 - [x] First progress log and run dashboard
-- [ ] Persistent run registry
-- [ ] Safer resume/restart controls
+- [x] Persistent condition-level run manifest
+- [x] Safer resume/restart controls
 - [ ] Batch-size controls for very large replication counts
 - [x] Generic lavaan parameter condition grid
 - [x] Bollen Political Democracy example preset
@@ -295,8 +352,8 @@ See [`docs/roadmap.md`](docs/roadmap.md) for the current high-impact SEM workben
 - [x] MCAR missing-data rate conditions
 - [x] MAR and MNAR missing-data mechanisms with target and driver controls
 - [x] Nonnormality conditions through lavaan skewness and excess kurtosis
-- [ ] model misspecification templates
-- [ ] multi-group SEM templates
+- [x] initial model misspecification presets
+- [x] initial multiple-group SEM support
 
 ### Phase 4: HPC-ready execution
 
@@ -304,7 +361,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for the current high-impact SEM workben
 - [x] SEM `targets` example
 - [x] SLURM template
 - [ ] condition sharding
-- [ ] checkpoint validation
+- [x] checkpoint validation
 - [ ] reproducible environment lockfiles
 
 ## Development status

@@ -83,6 +83,32 @@ sem_condition_grid(spec)
 sem_model_parameters(preset$population_model)
 sem_design_summary(spec)
 sem_design_warnings(spec)
+validate_simulation_design(spec)
+```
+
+## Add misspecification and groups
+
+Misspecification presets create common fitted-model deviations while keeping the
+population model explicit. Multiple-group starters simulate the same population
+model in labeled groups and fit a lavaan multiple-group model.
+
+```{r, eval = FALSE}
+sem_misspecification_presets()
+
+grouped <- sem_sim_spec(
+  population_model = preset$population_model,
+  fitted_model = preset$fitted_model,
+  n = c(200, 400),
+  reps = 500,
+  parameter_conditions = preset$parameter_conditions,
+  misspecification = "omit_structural_path",
+  group_variable = "study_group",
+  group_labels = c("reference", "comparison"),
+  group_proportions = c(.60, .40),
+  seed = 20260608
+)
+
+validate_simulation_design(grouped)
 ```
 
 ## Run with checkpoints
@@ -94,6 +120,16 @@ study <- run_simulation_study(
   checkpoint_dir = "results/checkpoints/sem-demo",
   resume = TRUE,
   output_dir = "results/sem-demo"
+)
+
+study$run_manifest
+cat(study$methods_text)
+read_run_manifest("results/checkpoints/sem-demo")
+
+retry_failed_conditions(
+  spec,
+  checkpoint_dir = "results/checkpoints/sem-demo",
+  workers = 4
 )
 ```
 

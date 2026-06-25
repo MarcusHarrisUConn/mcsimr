@@ -43,6 +43,10 @@ study <- run_simulation_study(
 )
 
 study$summary
+study$run_manifest
+cat(study$methods_text)
+
+read_run_manifest("results/checkpoints/ols-demo")
 ```
 
 ## Export a Quarto project

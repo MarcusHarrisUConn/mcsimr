@@ -9,5 +9,12 @@
 - Added `sem_model_presets()` and `sem_model_preset()` with CFA, structural regression, mediation, growth, and Bollen political democracy starting points.
 - Added MCAR, MAR, and MNAR missing-data mechanisms with missing target, driver, and slope controls for SEM simulations.
 - Added SEM design-inspection helpers for extracting lavaan parameters, summarizing crossed condition grids, and warning users about large or fragile designs before long runs.
-- Added reproducible Quarto project export with serialized simulation specs, runnable code, APA table markdown, model equations, raw results, summaries, and figures.
+- Added formal design validation with lavaan parse checks, parameter-condition checks, missing-data compatibility warnings, and large-run warnings.
+- Added initial SEM misspecification presets for omitted residual covariances, cross-loadings, structural paths, factor covariances, loadings, and factor-structure changes.
+- Added initial multiple-group SEM support with generated group variables, group labels, group proportions, and group-tagged parameter summaries.
+- Added persistent run manifests for checkpointed simulations, including completed, resumed, running, and failed condition status plus checkpoint validation before reuse.
+- Added retry support for failed checkpointed conditions.
+- Added APA HTML and Word-ready table exports.
+- Added generated methods text from the simulation specification for Quarto reports.
+- Added reproducible Quarto project export with serialized simulation specs, runnable code, APA table markdown/HTML/Word files, generated methods text, model equations, raw results, summaries, and figures.
 - Added a Shinylive browser demo and GitHub Pages deployment.

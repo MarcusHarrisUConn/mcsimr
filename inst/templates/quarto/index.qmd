@@ -31,6 +31,12 @@ spec$research_question
 source("run.R")
 ```
 
+## Methods Text
+
+```{r, results='asis'}
+cat(methods_text)
+```
+
 ## Model Equations
 
 ```{r, results='asis'}
@@ -61,6 +67,14 @@ cat(paste(apa_table$markdown, collapse = "\n"))
 
 ```{r}
 summary
+```
+
+## Run Manifest
+
+```{r}
+if (exists("run_manifest") && nrow(run_manifest)) {
+  run_manifest
+}
 ```
 
 ## Visualizations

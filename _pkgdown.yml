@@ -27,16 +27,20 @@ reference:
       - sem_sim_spec
       - sem_model_presets
       - sem_model_preset
+      - sem_misspecification_presets
+      - apply_sem_misspecification
       - sem_model_parameters
       - sem_parameter_conditions
       - sem_condition_grid
       - sem_design_summary
       - sem_design_warnings
+      - validate_simulation_design
   - title: Run simulations
     contents:
       - run_simulation_study
       - run_ols_simulation
       - run_sem_simulation
+      - retry_failed_conditions
       - available_cores
   - title: Summaries and output
     contents:
@@ -46,9 +50,14 @@ reference:
       - plot_metric
       - save_metric_plots
       - write_apa_tables
+      - write_apa_html
+      - write_apa_word
+      - simulation_methods_text
   - title: Reproducibility
     contents:
       - export_quarto_project
+      - read_run_manifest
+      - run_manifest_path
       - spec_equations
       - sem_model_latex
       - use_mcsimr_app

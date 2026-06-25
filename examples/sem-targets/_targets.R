@@ -40,6 +40,7 @@ list(
     )
   ),
   tar_target(summary, study$summary),
+  tar_target(run_manifest, study$run_manifest),
   tar_target(apa_table, study$apa_tables),
   tar_target(equations_latex, study$equations_latex)
 )

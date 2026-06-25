@@ -27,5 +27,9 @@ list(
   tar_target(
     summary,
     summarize_ols_results(raw_results)
+  ),
+  tar_target(
+    run_manifest,
+    read_run_manifest("results/checkpoints/ols_targets")
   )
 )

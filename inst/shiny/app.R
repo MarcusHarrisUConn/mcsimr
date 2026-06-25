@@ -595,6 +595,12 @@ ui <- page_sidebar(
             "input.simulation_type == 'sem'",
             textAreaInput("population_model", "Population model", default_population, rows = 9),
             textAreaInput("fitted_model", "Fitted lavaan model", default_fitted, rows = 6),
+            selectInput(
+              "misspecification",
+              "Fitted-model misspecification",
+              choices = stats::setNames(sem_misspecification_presets()$name, sem_misspecification_presets()$title),
+              selected = "none"
+            ),
             textInput("estimator", "Estimators", "ML"),
             selectInput("missing", "lavaan missing method", choices = c("listwise", "fiml", "ml", "direct"), selected = "listwise"),
             textInput("missing_rate", "Missing-data rates", "0"),
@@ -608,6 +614,9 @@ ui <- page_sidebar(
             textInput("missing_targets", "Missing targets", ""),
             textInput("missing_driver", "MAR driver", ""),
             numericInput("missing_slope", "Missingness slope", 1, min = -5, max = 5, step = 0.1),
+            textInput("group_variable", "Group variable", ""),
+            textInput("group_labels", "Group labels", ""),
+            textInput("group_proportions", "Group proportions", ""),
             textInput("skewness", "Observed-variable skewness", "0"),
             textInput("kurtosis", "Observed-variable excess kurtosis", "0"),
             checkboxInput("std_lv", "Use std.lv = TRUE", TRUE),
@@ -630,6 +639,10 @@ ui <- page_sidebar(
           card_header("Design summary"),
           tableOutput("design_summary"),
           uiOutput("design_warnings")
+        ),
+        card(
+          card_header("Validation"),
+          tableOutput("design_validation")
         ),
         card(
           card_header("Model parameters to vary"),
@@ -682,14 +695,20 @@ ui <- page_sidebar(
     nav_panel(
       "Run Dashboard",
       layout_columns(
-        col_widths = c(4, 8),
+        col_widths = c(4, 8, 12),
         card(
           card_header("Current run"),
-          uiOutput("run_status_cards")
+          uiOutput("run_status_cards"),
+          actionButton("refresh_manifest", "Refresh manifest"),
+          actionButton("retry_failed", "Retry failed conditions")
         ),
         card(
           card_header("Run log"),
           tableOutput("run_log")
+        ),
+        card(
+          card_header("Condition manifest"),
+          tags$div(class = "condition-preview", tableOutput("run_manifest"))
         )
       )
     ),
@@ -724,6 +743,7 @@ ui <- page_sidebar(
 
 server <- function(input, output, session) {
   study <- reactiveVal(NULL)
+  manifest <- reactiveVal(data.frame())
   export_status <- reactiveVal("No project exported yet.")
   exported_path <- reactiveVal(NULL)
   run_log <- reactiveVal(data.frame(
@@ -936,7 +956,7 @@ server <- function(input, output, session) {
 
   spec <- reactive({
     if (identical(input$simulation_type, "sem")) {
-      sem_sim_spec(
+    sem_sim_spec(
         population_model = input$population_model,
         fitted_model = input$fitted_model,
         n = parse_numeric(input$n),
@@ -948,6 +968,10 @@ server <- function(input, output, session) {
         missing_targets = parse_optional_character(input$missing_targets),
         missing_driver = parse_optional_character(input$missing_driver),
         missing_slope = input$missing_slope,
+        misspecification = input$misspecification,
+        group_variable = parse_optional_character(input$group_variable),
+        group_labels = parse_optional_character(input$group_labels),
+        group_proportions = if (is.null(parse_optional_character(input$group_proportions))) NULL else parse_numeric(input$group_proportions),
         skewness = parse_numeric(input$skewness),
         kurtosis = parse_numeric(input$kurtosis),
         missing = input$missing,
@@ -1000,6 +1024,11 @@ server <- function(input, output, session) {
     }))
   })
 
+  output$design_validation <- renderTable({
+    req(identical(input$simulation_type, "sem"))
+    validate_simulation_design(spec())
+  }, striped = TRUE, bordered = TRUE)
+
   output$condition_grid_full <- renderTable({
     req(identical(input$simulation_type, "sem"))
     sem_condition_grid(spec())
@@ -1026,9 +1055,26 @@ server <- function(input, output, session) {
       )
       incProgress(0.8)
       study(out)
+      manifest(out$run_manifest)
       append_run_log("completed", paste("Finished", nrow(out$summary), "summary rows."))
       incProgress(0.2)
     })
+  })
+
+  observeEvent(input$refresh_manifest, {
+    manifest(read_run_manifest(input$checkpoint_dir))
+    append_run_log("manifest", paste("Refreshed manifest from:", input$checkpoint_dir))
+  })
+
+  observeEvent(input$retry_failed, {
+    append_run_log("retry", "Retrying failed conditions from manifest.")
+    out <- retry_failed_conditions(
+      spec(),
+      checkpoint_dir = input$checkpoint_dir,
+      workers = active_workers()
+    )
+    manifest(read_run_manifest(input$checkpoint_dir))
+    append_run_log("retry", paste("Retry produced", nrow(out), "raw result rows."))
   })
 
   observeEvent(input$export_quarto, {
@@ -1049,14 +1095,43 @@ server <- function(input, output, session) {
     run_log()
   }, striped = TRUE, bordered = TRUE)
 
+  output$run_manifest <- renderTable({
+    current <- manifest()
+    if (!nrow(current)) {
+      current <- read_run_manifest(input$checkpoint_dir)
+    }
+    if (!nrow(current)) {
+      return(data.frame(message = "No run manifest has been written yet.", stringsAsFactors = FALSE))
+    }
+    keep <- intersect(
+      c(
+        "condition_id", "status", "attempts", "n_rows", "started_at", "finished_at",
+        "duration_seconds", "resumed_from_checkpoint", "error"
+      ),
+      names(current)
+    )
+    current[, keep, drop = FALSE]
+  }, striped = TRUE, bordered = TRUE)
+
   output$run_status_cards <- renderUI({
     current <- run_log()
     last <- if (nrow(current)) current[nrow(current), , drop = FALSE] else NULL
+    current_manifest <- manifest()
+    if (!nrow(current_manifest)) {
+      current_manifest <- read_run_manifest(input$checkpoint_dir)
+    }
+    manifest_summary <- if (nrow(current_manifest)) {
+      counts <- table(current_manifest$status, useNA = "ifany")
+      paste(paste(names(counts), as.integer(counts), sep = ": "), collapse = "; ")
+    } else {
+      "No manifest yet."
+    }
     tagList(
       tags$p(tags$strong("Status"), tags$br(), if (is.null(last)) "Idle" else last$status),
       tags$p(tags$strong("Last update"), tags$br(), if (is.null(last)) "No activity yet." else last$time),
       tags$p(tags$strong("Workers"), tags$br(), active_workers()),
-      tags$p(tags$strong("Checkpointing"), tags$br(), input$checkpoint_dir)
+      tags$p(tags$strong("Checkpointing"), tags$br(), input$checkpoint_dir),
+      tags$p(tags$strong("Manifest"), tags$br(), manifest_summary)
     )
   })
 
@@ -1117,6 +1192,10 @@ server <- function(input, output, session) {
           "  missing_targets = %s,",
           "  missing_driver = %s,",
           "  missing_slope = %s,",
+          "  misspecification = %s,",
+          "  group_variable = %s,",
+          "  group_labels = %s,",
+          "  group_proportions = %s,",
           "  skewness = c(%s),",
           "  kurtosis = c(%s),",
           "  parameter_conditions = sem_parameter_conditions(",
@@ -1140,6 +1219,8 @@ server <- function(input, output, session) {
           ")",
           "summary <- study$summary",
           "apa_table <- study$apa_tables",
+          "run_manifest <- study$run_manifest",
+          "methods_text <- study$methods_text",
           "equations_latex <- study$equations_latex",
           sep = "\n"
         ),
@@ -1154,6 +1235,10 @@ server <- function(input, output, session) {
         r_character_vector_or_null(parse_optional_character(input$missing_targets)),
         r_character_vector_or_null(parse_optional_character(input$missing_driver)),
         input$missing_slope,
+        deparse(input$misspecification),
+        r_character_vector_or_null(parse_optional_character(input$group_variable)),
+        r_character_vector_or_null(parse_optional_character(input$group_labels)),
+        if (is.null(parse_optional_character(input$group_proportions))) "NULL" else paste0("c(", paste(parse_numeric(input$group_proportions), collapse = ", "), ")"),
         paste(parse_numeric(input$skewness), collapse = ", "),
         paste(parse_numeric(input$kurtosis), collapse = ", "),
         paste(sprintf('"%s"', pc$lhs), collapse = ", "),
@@ -1195,6 +1280,8 @@ server <- function(input, output, session) {
         ")",
         "summary <- study$summary",
         "apa_table <- study$apa_tables",
+        "run_manifest <- study$run_manifest",
+        "methods_text <- study$methods_text",
         "equations_latex <- study$equations_latex",
         sep = "\n"
       ),

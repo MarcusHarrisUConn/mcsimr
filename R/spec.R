@@ -82,6 +82,10 @@ sem_sim_spec <- function(population_model,
                          missing_targets = NULL,
                          missing_driver = NULL,
                          missing_slope = 1,
+                         misspecification = "none",
+                         group_variable = NULL,
+                         group_labels = NULL,
+                         group_proportions = NULL,
                          skewness = 0,
                          kurtosis = 0,
                          missing = "listwise",
@@ -103,9 +107,34 @@ sem_sim_spec <- function(population_model,
     choices = c("none", "mcar", "mar", "mnar"),
     several.ok = TRUE
   )
+  misspecification <- match.arg(
+    misspecification,
+    choices = sem_misspecification_presets()$name
+  )
   stopifnot(length(skewness) >= 1L)
   stopifnot(length(kurtosis) >= 1L)
+  if (!is.null(group_labels)) {
+    group_labels <- as.character(group_labels)
+    stopifnot(length(group_labels) >= 2L)
+  }
+  if (!is.null(group_variable)) {
+    group_variable <- as.character(group_variable)[1L]
+    if (is.null(group_labels)) {
+      group_labels <- c("group_1", "group_2")
+    }
+  }
+  if (!is.null(group_proportions)) {
+    group_proportions <- as.numeric(group_proportions)
+    stopifnot(length(group_proportions) == length(group_labels))
+    stopifnot(all(group_proportions > 0))
+    group_proportions <- group_proportions / sum(group_proportions)
+  }
   parameter_conditions <- normalize_sem_parameter_conditions(parameter_conditions)
+  fitted_model <- apply_sem_misspecification(
+    fitted_model = fitted_model,
+    preset = misspecification,
+    population_model = population_model
+  )
 
   spec <- list(
     type = "sem",
@@ -122,6 +151,10 @@ sem_sim_spec <- function(population_model,
     missing_targets = if (is.null(missing_targets)) NULL else as.character(missing_targets),
     missing_driver = if (is.null(missing_driver)) NULL else as.character(missing_driver)[1L],
     missing_slope = as.numeric(missing_slope)[1L],
+    misspecification = as.character(misspecification),
+    group_variable = group_variable,
+    group_labels = group_labels,
+    group_proportions = group_proportions,
     skewness = as.numeric(skewness),
     kurtosis = as.numeric(kurtosis),
     missing = as.character(missing),

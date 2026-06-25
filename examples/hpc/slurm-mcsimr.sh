@@ -12,3 +12,4 @@ mkdir -p logs results/checkpoints results/sem-targets
 
 Rscript -e "install.packages(c('targets', 'tarchetypes'), repos = 'https://cloud.r-project.org')"
 Rscript -e "targets::tar_make(callr_function = NULL)"
+echo "Run manifest: results/checkpoints/sem-targets/run-manifest.csv"

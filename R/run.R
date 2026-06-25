@@ -97,26 +97,84 @@ run_ols_simulation <- function(spec,
   if (!is.null(checkpoint_dir)) {
     dir.create(checkpoint_dir, recursive = TRUE, showWarnings = FALSE)
     yaml::write_yaml(spec, file.path(checkpoint_dir, "spec.yml"))
+    initialize_run_manifest(grid, checkpoint_dir)
   }
 
   results <- vector("list", nrow(grid))
   for (i in seq_len(nrow(grid))) {
     condition <- grid[i, , drop = FALSE]
     checkpoint_file <- if (!is.null(checkpoint_dir)) {
-      file.path(checkpoint_dir, sprintf("condition_%03d.rds", condition$condition_id))
+      condition_checkpoint_path(checkpoint_dir, condition$condition_id)
     } else {
       NULL
     }
 
     if (resume && !is.null(checkpoint_file) && file.exists(checkpoint_file)) {
-      results[[i]] <- readRDS(checkpoint_file)
-      next
+      checkpoint_result <- tryCatch(
+        read_condition_checkpoint(checkpoint_file, condition_id = condition$condition_id),
+        error = identity
+      )
+      if (!inherits(checkpoint_result, "error")) {
+        update_run_manifest(
+          checkpoint_dir = checkpoint_dir,
+          condition_id = condition$condition_id,
+          status = "resumed",
+          finished_at = current_manifest_time(),
+          n_rows = nrow(checkpoint_result),
+          error = NA_character_,
+          resumed_from_checkpoint = TRUE
+        )
+        results[[i]] <- checkpoint_result
+        next
+      }
+      update_run_manifest(
+        checkpoint_dir = checkpoint_dir,
+        condition_id = condition$condition_id,
+        status = "queued",
+        error = paste("Invalid checkpoint, rerunning:", conditionMessage(checkpoint_result)),
+        resumed_from_checkpoint = FALSE
+      )
     }
 
-    condition_result <- run_condition(spec, condition, workers = workers)
+    started <- Sys.time()
+    update_run_manifest(
+      checkpoint_dir = checkpoint_dir,
+      condition_id = condition$condition_id,
+      status = "running",
+      started_at = format(started, "%Y-%m-%d %H:%M:%S"),
+      error = NA_character_,
+      resumed_from_checkpoint = FALSE,
+      increment_attempt = TRUE
+    )
+    condition_result <- tryCatch(
+      run_condition(spec, condition, workers = workers),
+      error = identity
+    )
+    if (inherits(condition_result, "error")) {
+      update_run_manifest(
+        checkpoint_dir = checkpoint_dir,
+        condition_id = condition$condition_id,
+        status = "failed",
+        finished_at = current_manifest_time(),
+        duration_seconds = as.numeric(difftime(Sys.time(), started, units = "secs")),
+        error = conditionMessage(condition_result),
+        resumed_from_checkpoint = FALSE
+      )
+      stop(conditionMessage(condition_result), call. = FALSE)
+    }
     if (!is.null(checkpoint_file)) {
       saveRDS(condition_result, checkpoint_file)
     }
+    update_run_manifest(
+      checkpoint_dir = checkpoint_dir,
+      condition_id = condition$condition_id,
+      status = "completed",
+      finished_at = current_manifest_time(),
+      duration_seconds = as.numeric(difftime(Sys.time(), started, units = "secs")),
+      n_rows = nrow(condition_result),
+      error = NA_character_,
+      resumed_from_checkpoint = FALSE
+    )
     results[[i]] <- condition_result
   }
 
@@ -157,6 +215,8 @@ run_simulation_study <- function(spec,
     raw_results = raw,
     summary = summary,
     apa_tables = apa,
+    run_manifest = if (!is.null(checkpoint_dir)) read_run_manifest(checkpoint_dir) else data.frame(),
+    methods_text = simulation_methods_text(spec),
     metric_catalog = metric_catalog(spec$type),
     created_at = as.character(Sys.time())
   )
@@ -167,7 +227,13 @@ run_simulation_study <- function(spec,
     saveRDS(bundle, file.path(output_dir, "simulation-study.rds"))
     utils::write.csv(raw, file.path(output_dir, "raw-results.csv"), row.names = FALSE)
     utils::write.csv(summary, file.path(output_dir, "metric-summary.csv"), row.names = FALSE)
+    if (nrow(bundle$run_manifest)) {
+      utils::write.csv(bundle$run_manifest, file.path(output_dir, "run-manifest.csv"), row.names = FALSE)
+    }
     write_apa_tables(apa, file.path(output_dir, "apa-tables.md"))
+    write_apa_html(apa, file.path(output_dir, "apa-tables.html"))
+    write_apa_word(apa, file.path(output_dir, "apa-tables.doc"))
+    writeLines(bundle$methods_text, file.path(output_dir, "methods-text.md"))
     save_metric_plots(summary, file.path(output_dir, "figures"))
   }
 

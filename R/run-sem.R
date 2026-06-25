@@ -13,11 +13,12 @@ run_sem_replication <- function(spec, condition, rep_id) {
   }
 
   dat <- tryCatch(
-    lavaan::simulateData(
+    simulate_sem_data(
+      spec = spec,
       model = conditioned_population,
-      sample.nobs = condition$n,
-      skewness = sem_moment_arg(condition$skewness),
-      kurtosis = sem_moment_arg(condition$kurtosis)
+      n = condition$n,
+      skewness = condition$skewness,
+      kurtosis = condition$kurtosis
     ),
     error = identity
   )
@@ -33,14 +34,18 @@ run_sem_replication <- function(spec, condition, rep_id) {
     slope = spec$missing_slope
   )
 
+  fit_args <- list(
+    model = spec$fitted_model,
+    data = dat,
+    estimator = condition$estimator,
+    missing = spec$missing,
+    std.lv = spec$std_lv
+  )
+  if (!is.null(spec$group_variable)) {
+    fit_args$group <- spec$group_variable
+  }
   fit <- tryCatch(
-    lavaan::sem(
-      model = spec$fitted_model,
-      data = dat,
-      estimator = condition$estimator,
-      missing = spec$missing,
-      std.lv = spec$std_lv
-    ),
+    do.call(lavaan::sem, fit_args),
     error = identity
   )
   if (inherits(fit, "error")) {
@@ -54,7 +59,17 @@ run_sem_replication <- function(spec, condition, rep_id) {
   }
 
   true_values <- sem_true_values(conditioned_population)
+  if ("group" %in% names(pe) && !is.null(spec$group_labels)) {
+    pe$group_label <- spec$group_labels[pe$group]
+  } else {
+    pe$group_label <- NA_character_
+  }
   pe$term <- paste(pe$lhs, pe$op, pe$rhs)
+  pe$term <- ifelse(
+    is.na(pe$group_label),
+    pe$term,
+    paste0(pe$term, " [", pe$group_label, "]")
+  )
   pe$key <- sem_param_key(pe$lhs, pe$op, pe$rhs)
   pe$true_value <- true_values[pe$key]
 
@@ -71,6 +86,7 @@ run_sem_replication <- function(spec, condition, rep_id) {
     kurtosis = condition$kurtosis,
     parameter_conditions = condition$parameter_conditions,
     rep_id = rep_id,
+    group = pe$group_label,
     term = pe$term,
     lhs = pe$lhs,
     op = pe$op,
@@ -112,7 +128,8 @@ run_sem_condition <- function(spec, condition, workers = 1L) {
         "apply_sem_parameter_conditions", "normalize_sem_parameter_conditions",
         "sem_parameter_conditions", "sem_condition_column_names",
         "apply_mcar_missing", "apply_sem_missing", "resolve_missing_targets",
-        "missing_probabilities", "standardize_for_missing", "sem_moment_arg"
+        "missing_probabilities", "standardize_for_missing", "sem_moment_arg",
+        "simulate_sem_data", "sem_group_sample_sizes"
       ),
       envir = environment()
     )
@@ -129,6 +146,46 @@ run_sem_condition <- function(spec, condition, workers = 1L) {
   do.call(rbind, pieces)
 }
 
+simulate_sem_data <- function(spec, model, n, skewness = 0, kurtosis = 0) {
+  if (is.null(spec$group_variable)) {
+    return(lavaan::simulateData(
+      model = model,
+      sample.nobs = n,
+      skewness = sem_moment_arg(skewness),
+      kurtosis = sem_moment_arg(kurtosis)
+    ))
+  }
+
+  group_labels <- spec$group_labels
+  group_n <- sem_group_sample_sizes(n, group_labels, spec$group_proportions)
+  pieces <- lapply(seq_along(group_labels), function(i) {
+    dat <- lavaan::simulateData(
+      model = model,
+      sample.nobs = group_n[[i]],
+      skewness = sem_moment_arg(skewness),
+      kurtosis = sem_moment_arg(kurtosis)
+    )
+    dat[[spec$group_variable]] <- group_labels[[i]]
+    dat
+  })
+  out <- do.call(rbind, pieces)
+  rownames(out) <- NULL
+  out
+}
+
+sem_group_sample_sizes <- function(n, group_labels, group_proportions = NULL) {
+  n <- as.integer(n)[1L]
+  if (is.null(group_proportions)) {
+    group_proportions <- rep(1 / length(group_labels), length(group_labels))
+  }
+  counts <- floor(n * group_proportions)
+  remainder <- n - sum(counts)
+  if (remainder > 0L) {
+    counts[seq_len(remainder)] <- counts[seq_len(remainder)] + 1L
+  }
+  pmax(1L, counts)
+}
+
 run_sem_simulation <- function(spec,
                                workers = 1L,
                                checkpoint_dir = NULL,
@@ -139,26 +196,84 @@ run_sem_simulation <- function(spec,
   if (!is.null(checkpoint_dir)) {
     dir.create(checkpoint_dir, recursive = TRUE, showWarnings = FALSE)
     yaml::write_yaml(spec, file.path(checkpoint_dir, "spec.yml"))
+    initialize_run_manifest(grid, checkpoint_dir)
   }
 
   results <- vector("list", nrow(grid))
   for (i in seq_len(nrow(grid))) {
     condition <- grid[i, , drop = FALSE]
     checkpoint_file <- if (!is.null(checkpoint_dir)) {
-      file.path(checkpoint_dir, sprintf("condition_%03d.rds", condition$condition_id))
+      condition_checkpoint_path(checkpoint_dir, condition$condition_id)
     } else {
       NULL
     }
 
     if (resume && !is.null(checkpoint_file) && file.exists(checkpoint_file)) {
-      results[[i]] <- readRDS(checkpoint_file)
-      next
+      checkpoint_result <- tryCatch(
+        read_condition_checkpoint(checkpoint_file, condition_id = condition$condition_id),
+        error = identity
+      )
+      if (!inherits(checkpoint_result, "error")) {
+        update_run_manifest(
+          checkpoint_dir = checkpoint_dir,
+          condition_id = condition$condition_id,
+          status = "resumed",
+          finished_at = current_manifest_time(),
+          n_rows = nrow(checkpoint_result),
+          error = NA_character_,
+          resumed_from_checkpoint = TRUE
+        )
+        results[[i]] <- checkpoint_result
+        next
+      }
+      update_run_manifest(
+        checkpoint_dir = checkpoint_dir,
+        condition_id = condition$condition_id,
+        status = "queued",
+        error = paste("Invalid checkpoint, rerunning:", conditionMessage(checkpoint_result)),
+        resumed_from_checkpoint = FALSE
+      )
     }
 
-    condition_result <- run_sem_condition(spec, condition, workers = workers)
+    started <- Sys.time()
+    update_run_manifest(
+      checkpoint_dir = checkpoint_dir,
+      condition_id = condition$condition_id,
+      status = "running",
+      started_at = format(started, "%Y-%m-%d %H:%M:%S"),
+      error = NA_character_,
+      resumed_from_checkpoint = FALSE,
+      increment_attempt = TRUE
+    )
+    condition_result <- tryCatch(
+      run_sem_condition(spec, condition, workers = workers),
+      error = identity
+    )
+    if (inherits(condition_result, "error")) {
+      update_run_manifest(
+        checkpoint_dir = checkpoint_dir,
+        condition_id = condition$condition_id,
+        status = "failed",
+        finished_at = current_manifest_time(),
+        duration_seconds = as.numeric(difftime(Sys.time(), started, units = "secs")),
+        error = conditionMessage(condition_result),
+        resumed_from_checkpoint = FALSE
+      )
+      stop(conditionMessage(condition_result), call. = FALSE)
+    }
     if (!is.null(checkpoint_file)) {
       saveRDS(condition_result, checkpoint_file)
     }
+    update_run_manifest(
+      checkpoint_dir = checkpoint_dir,
+      condition_id = condition$condition_id,
+      status = "completed",
+      finished_at = current_manifest_time(),
+      duration_seconds = as.numeric(difftime(Sys.time(), started, units = "secs")),
+      n_rows = nrow(condition_result),
+      error = NA_character_,
+      resumed_from_checkpoint = FALSE
+    )
     results[[i]] <- condition_result
   }
 
@@ -316,6 +431,7 @@ sem_error_row <- function(spec, condition, rep_id, error, converged = FALSE) {
     kurtosis = condition$kurtosis,
     parameter_conditions = condition$parameter_conditions,
     rep_id = rep_id,
+    group = NA_character_,
     term = NA_character_,
     lhs = NA_character_,
     op = NA_character_,

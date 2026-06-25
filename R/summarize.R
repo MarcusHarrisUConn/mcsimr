@@ -190,6 +190,66 @@ write_apa_tables <- function(apa_table, path) {
   invisible(path)
 }
 
+write_apa_html <- function(apa_table, path) {
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  tab <- apa_table$table
+  html <- c(
+    "<!doctype html>",
+    "<html>",
+    "<head>",
+    "<meta charset=\"utf-8\">",
+    "<style>",
+    "body{font-family: Georgia, 'Times New Roman', serif; color:#111;}",
+    "table{border-collapse:collapse; width:100%; font-size:12pt;}",
+    "caption{text-align:left; font-weight:bold; margin-bottom:0.5rem;}",
+    "thead th{border-top:2px solid #111; border-bottom:1px solid #111;}",
+    "tbody tr:last-child td{border-bottom:2px solid #111;}",
+    "td,th{padding:0.35rem 0.45rem; vertical-align:top;}",
+    ".note{margin-top:0.5rem; font-style:italic;}",
+    "</style>",
+    "</head>",
+    "<body>",
+    apa_table_html(apa_table),
+    "</body>",
+    "</html>"
+  )
+  writeLines(html, path)
+  invisible(path)
+}
+
+write_apa_word <- function(apa_table, path) {
+  if (!grepl("[.](doc|html?)$", path, ignore.case = TRUE)) {
+    path <- paste0(path, ".doc")
+  }
+  write_apa_html(apa_table, path)
+}
+
+apa_table_html <- function(apa_table) {
+  tab <- apa_table$table
+  header <- paste0("<th>", html_escape(names(tab)), "</th>", collapse = "")
+  rows <- apply(tab, 1L, function(row) {
+    paste0("<tr>", paste0("<td>", html_escape(row), "</td>", collapse = ""), "</tr>")
+  })
+  paste(
+    "<table>",
+    paste0("<caption>", html_escape(strsplit(apa_table$caption, "\n", fixed = TRUE)[[1L]][[1L]]), "</caption>"),
+    paste0("<thead><tr>", header, "</tr></thead>"),
+    paste0("<tbody>", paste(rows, collapse = ""), "</tbody>"),
+    "</table>",
+    "<p class=\"note\">Note. Values are rounded for display; generated CSV outputs retain full precision.</p>",
+    collapse = "\n"
+  )
+}
+
+html_escape <- function(x) {
+  x <- as.character(x)
+  x <- gsub("&", "&amp;", x, fixed = TRUE)
+  x <- gsub("<", "&lt;", x, fixed = TRUE)
+  x <- gsub(">", "&gt;", x, fixed = TRUE)
+  x <- gsub('"', "&quot;", x, fixed = TRUE)
+  x
+}
+
 plot_metric <- function(summary,
                         metric = "bias",
                         term = NULL,

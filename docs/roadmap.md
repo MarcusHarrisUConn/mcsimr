@@ -15,10 +15,12 @@ simulation platform rather than a single-purpose example app.
   vary across conditions.
 - [ ] Extend the visual builders for residual variances, factor covariances,
   structural regressions, intercepts, thresholds, and residual covariances.
-- [ ] Add model misspecification presets: omitted residual covariance, omitted
+- [x] Add initial model misspecification presets: omitted residual covariance, omitted
   cross-loading, omitted structural path, equality constraint mismatch, and
   wrong factor structure.
-- [ ] Add multi-group and longitudinal templates.
+- [x] Add initial multiple-group SEM support with group labels and group-size
+  proportions.
+- [ ] Add longitudinal templates.
 
 ## 2. Condition Design Breadth
 
@@ -27,15 +29,17 @@ simulation platform rather than a single-purpose example app.
 - [x] Support MCAR, MAR, and MNAR missingness with target variables, driver
   variables, and missingness slopes.
 - [x] Add pre-run design summaries and warnings for fragile or large designs.
+- [x] Add formal design validation with parse checks, parameter-condition checks,
+  missing-data compatibility warnings, and large-run warnings.
 - [ ] Add condition labels, condition sets, and saved presets.
 - [ ] Add expected runtime estimates from pilot runs.
 
 ## 3. Long-Run Execution
 
-- [ ] Write a run manifest that records queued, running, completed, failed, and
+- [x] Write a run manifest that records queued, running, completed, failed, and
   resumed conditions.
-- [ ] Validate checkpoint files before reuse.
-- [ ] Add retry controls for failed conditions.
+- [x] Validate checkpoint files before reuse.
+- [x] Add retry controls for failed conditions.
 - [ ] Add background R job support for local desktop runs.
 - [ ] Add condition sharding for SLURM and other HPC schedulers.
 
@@ -44,14 +48,14 @@ simulation platform rather than a single-purpose example app.
 - [x] Export Quarto projects with the complete spec, session info,
   model equations, raw lavaan syntax, condition grid, raw results, summaries,
   APA tables, and figures.
-- [ ] Add run manifests to Quarto exports.
-- [ ] Add Word-ready and HTML-ready APA tables.
-- [ ] Generate methods text from the simulation specification.
+- [x] Add run manifests to Quarto exports.
+- [x] Add Word-ready and HTML-ready APA tables.
+- [x] Generate methods text from the simulation specification.
 - [ ] Include warnings and failed-condition summaries in reports.
 
 ## 5. Package Quality
 
-- [x] Expand tests for presets, missingness, and design summaries.
+- [x] Expand tests for presets, missingness, design summaries, and run manifests.
 - [ ] Expand tests for nonnormality, parallel execution,
   checkpoint recovery, app-generated specs, and Quarto exports.
 - [ ] Add full pkgdown reference and article site.

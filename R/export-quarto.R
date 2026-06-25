@@ -39,9 +39,15 @@ export_quarto_project <- function(spec,
     "results <- study$raw_results",
     "summary <- study$summary",
     "apa_table <- study$apa_tables",
+    "run_manifest <- study$run_manifest",
+    "methods_text <- study$methods_text",
     "equations_latex <- study$equations_latex",
     "writeLines(equations_latex, 'results/model-equations.tex')",
-    "writeLines(apa_table$markdown, 'results/apa-table.md')"
+    "writeLines(apa_table$markdown, 'results/apa-table.md')",
+    "write_apa_html(apa_table, 'results/apa-table.html')",
+    "write_apa_word(apa_table, 'results/apa-table.doc')",
+    "writeLines(methods_text, 'results/methods-text.md')",
+    "if (nrow(run_manifest)) utils::write.csv(run_manifest, 'results/run-manifest.csv', row.names = FALSE)"
   ), file.path(path, "run.R"))
 
   invisible(normalizePath(path, winslash = "/", mustWork = FALSE))
