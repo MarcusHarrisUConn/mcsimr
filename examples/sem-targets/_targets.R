@@ -30,6 +30,10 @@ list(
     )
   ),
   tar_target(
+    shard_map,
+    condition_shards(spec, shards = 4)
+  ),
+  tar_target(
     study,
     run_simulation_study(
       spec,
@@ -41,6 +45,8 @@ list(
   ),
   tar_target(summary, study$summary),
   tar_target(run_manifest, study$run_manifest),
+  tar_target(failure_summary, study$failure_summary),
+  tar_target(runtime_estimate, study$runtime_estimate),
   tar_target(apa_table, study$apa_tables),
   tar_target(equations_latex, study$equations_latex)
 )

@@ -14,6 +14,8 @@
 - Added initial multiple-group SEM support with generated group variables, group labels, group proportions, and group-tagged parameter summaries.
 - Added persistent run manifests for checkpointed simulations, including completed, resumed, running, and failed condition status plus checkpoint validation before reuse.
 - Added retry support for failed checkpointed conditions.
+- Added deterministic condition sharding for HPC/SLURM array workflows, plus checkpoint collection helpers.
+- Added failed-condition summaries and pilot-run runtime estimates from run manifests.
 - Added APA HTML and Word-ready table exports.
 - Added generated methods text from the simulation specification for Quarto reports.
 - Added reproducible Quarto project export with serialized simulation specs, runnable code, APA table markdown/HTML/Word files, generated methods text, model equations, raw results, summaries, and figures.

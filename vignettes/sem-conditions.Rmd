@@ -133,6 +133,28 @@ retry_failed_conditions(
 )
 ```
 
+## Split large designs into shards
+
+For HPC systems or multiple desktop sessions, split the condition grid into
+deterministic shards. Each shard writes to its own checkpoint subdirectory.
+
+```{r, eval = FALSE}
+condition_shards(spec, shards = 8)
+
+run_simulation_shard(
+  spec,
+  shard_id = 1,
+  shards = 8,
+  workers = 8,
+  checkpoint_dir = "results/checkpoints/sem-shards",
+  output_dir = "results/sem-shards"
+)
+
+all_raw <- collect_checkpoint_results("results/checkpoints/sem-shards")
+run_failure_summary("results/checkpoints/sem-shards/shard-001-of-008")
+runtime_estimate_from_manifest("results/checkpoints/sem-shards/shard-001-of-008")
+```
+
 The summary includes the parameter-condition label, missing rate, missing-data
 mechanism, skewness, and kurtosis so APA-style tables and plots can be
 interpreted by condition, not only by numeric condition id.

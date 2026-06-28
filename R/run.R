@@ -90,9 +90,10 @@ run_condition <- function(spec, condition, workers = 1L) {
 run_ols_simulation <- function(spec,
                                workers = 1L,
                                checkpoint_dir = NULL,
-                               resume = TRUE) {
+                               resume = TRUE,
+                               condition_ids = NULL) {
   validate_ols_spec(spec)
-  grid <- condition_grid(spec)
+  grid <- subset_condition_grid(condition_grid(spec), condition_ids = condition_ids)
 
   if (!is.null(checkpoint_dir)) {
     dir.create(checkpoint_dir, recursive = TRUE, showWarnings = FALSE)
@@ -187,14 +188,16 @@ run_simulation_study <- function(spec,
                                  workers = 1L,
                                  checkpoint_dir = NULL,
                                  resume = TRUE,
-                                 output_dir = NULL) {
+                                 output_dir = NULL,
+                                 condition_ids = NULL) {
   if (identical(spec$type, "sem") || inherits(spec, "mcsimr_sem_spec")) {
     validate_sem_spec(spec)
     raw <- run_sem_simulation(
       spec = spec,
       workers = workers,
       checkpoint_dir = checkpoint_dir,
-      resume = resume
+      resume = resume,
+      condition_ids = condition_ids
     )
     summary <- summarize_sem_results(raw, metrics = spec$metrics)
   } else {
@@ -203,11 +206,19 @@ run_simulation_study <- function(spec,
       spec = spec,
       workers = workers,
       checkpoint_dir = checkpoint_dir,
-      resume = resume
+      resume = resume,
+      condition_ids = condition_ids
     )
     summary <- summarize_ols_results(raw, metrics = spec$metrics)
   }
   apa <- apa_metric_table(summary, metrics = spec$metrics)
+
+  manifest <- if (!is.null(checkpoint_dir)) read_run_manifest(checkpoint_dir) else data.frame()
+  failure_summary <- run_failure_summary(manifest)
+  runtime_estimate <- runtime_estimate_from_manifest(
+    manifest,
+    total_conditions = if (is.null(condition_ids)) nrow(simulation_condition_grid(spec)) else length(condition_ids)
+  )
 
   bundle <- list(
     spec = spec,
@@ -215,7 +226,9 @@ run_simulation_study <- function(spec,
     raw_results = raw,
     summary = summary,
     apa_tables = apa,
-    run_manifest = if (!is.null(checkpoint_dir)) read_run_manifest(checkpoint_dir) else data.frame(),
+    run_manifest = manifest,
+    failure_summary = failure_summary,
+    runtime_estimate = runtime_estimate,
     methods_text = simulation_methods_text(spec),
     metric_catalog = metric_catalog(spec$type),
     created_at = as.character(Sys.time())
@@ -229,6 +242,12 @@ run_simulation_study <- function(spec,
     utils::write.csv(summary, file.path(output_dir, "metric-summary.csv"), row.names = FALSE)
     if (nrow(bundle$run_manifest)) {
       utils::write.csv(bundle$run_manifest, file.path(output_dir, "run-manifest.csv"), row.names = FALSE)
+    }
+    if (nrow(bundle$failure_summary)) {
+      utils::write.csv(bundle$failure_summary, file.path(output_dir, "failure-summary.csv"), row.names = FALSE)
+    }
+    if (nrow(bundle$runtime_estimate)) {
+      utils::write.csv(bundle$runtime_estimate, file.path(output_dir, "runtime-estimate.csv"), row.names = FALSE)
     }
     write_apa_tables(apa, file.path(output_dir, "apa-tables.md"))
     write_apa_html(apa, file.path(output_dir, "apa-tables.html"))

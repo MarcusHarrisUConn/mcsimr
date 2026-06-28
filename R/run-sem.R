@@ -189,9 +189,10 @@ sem_group_sample_sizes <- function(n, group_labels, group_proportions = NULL) {
 run_sem_simulation <- function(spec,
                                workers = 1L,
                                checkpoint_dir = NULL,
-                               resume = TRUE) {
+                               resume = TRUE,
+                               condition_ids = NULL) {
   validate_sem_spec(spec)
-  grid <- sem_condition_grid(spec)
+  grid <- subset_condition_grid(sem_condition_grid(spec), condition_ids = condition_ids)
 
   if (!is.null(checkpoint_dir)) {
     dir.create(checkpoint_dir, recursive = TRUE, showWarnings = FALSE)

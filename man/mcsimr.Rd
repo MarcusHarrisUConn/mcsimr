@@ -2,6 +2,8 @@
 \alias{mcsimr}
 \alias{available_cores}
 \alias{apa_metric_table}
+\alias{collect_checkpoint_results}
+\alias{condition_shards}
 \alias{default_metrics}
 \alias{export_quarto_project}
 \alias{metric_catalog}
@@ -20,8 +22,11 @@
 \alias{run_ols_simulation}
 \alias{run_replication}
 \alias{run_sem_simulation}
+\alias{run_failure_summary}
 \alias{run_simulation_study}
+\alias{run_simulation_shard}
 \alias{retry_failed_conditions}
+\alias{runtime_estimate_from_manifest}
 \alias{save_metric_plots}
 \alias{sem_condition_grid}
 \alias{sem_design_summary}
@@ -104,15 +109,29 @@ run_replication(spec, n, rep_id, condition_id = 1L)
 
 run_condition(spec, condition, workers = 1L)
 
-run_ols_simulation(spec, workers = 1L, checkpoint_dir = NULL, resume = TRUE)
+run_ols_simulation(spec, workers = 1L, checkpoint_dir = NULL,
+  resume = TRUE, condition_ids = NULL)
 
-run_sem_simulation(spec, workers = 1L, checkpoint_dir = NULL, resume = TRUE)
+run_sem_simulation(spec, workers = 1L, checkpoint_dir = NULL,
+  resume = TRUE, condition_ids = NULL)
 
 run_simulation_study(spec, workers = 1L, checkpoint_dir = NULL,
-  resume = TRUE, output_dir = NULL)
+  resume = TRUE, output_dir = NULL, condition_ids = NULL)
+
+condition_shards(spec, shards, strategy = c("round_robin", "contiguous"))
+
+run_simulation_shard(spec, shard_id, shards, workers = 1L,
+  checkpoint_dir = NULL, resume = TRUE, output_dir = NULL,
+  strategy = c("round_robin", "contiguous"))
+
+collect_checkpoint_results(checkpoint_dir, recursive = TRUE)
 
 retry_failed_conditions(spec, checkpoint_dir, workers = 1L,
   condition_ids = NULL)
+
+run_failure_summary(manifest)
+
+runtime_estimate_from_manifest(manifest, total_conditions = NULL)
 
 summarize_ols_results(results, metrics = default_metrics("ols"))
 
@@ -197,7 +216,13 @@ use_mcsimr_app(...)
 \item{term}{Optional parameter term filter for plots.}
 \item{path}{Export destination for a Quarto project.}
 \item{preset}{Misspecification preset name.}
-\item{condition_ids}{Optional failed condition identifiers to retry.}
+\item{condition_ids}{Optional condition identifiers to run or retry.}
+\item{shards}{Number of shards used to split the condition grid.}
+\item{shard_id}{One-based shard identifier to run.}
+\item{strategy}{Condition-assignment strategy for sharding.}
+\item{recursive}{Whether checkpoint collection should search nested shard directories.}
+\item{manifest}{Run manifest data frame or checkpoint directory.}
+\item{total_conditions}{Optional total number of conditions for runtime estimation.}
 \item{width}{PNG width in pixels.}
 \item{height}{PNG height in pixels.}
 \item{overwrite}{Whether template files may be overwritten.}

@@ -32,7 +32,7 @@ simulation platform rather than a single-purpose example app.
 - [x] Add formal design validation with parse checks, parameter-condition checks,
   missing-data compatibility warnings, and large-run warnings.
 - [ ] Add condition labels, condition sets, and saved presets.
-- [ ] Add expected runtime estimates from pilot runs.
+- [x] Add expected runtime estimates from pilot runs.
 
 ## 3. Long-Run Execution
 
@@ -41,7 +41,7 @@ simulation platform rather than a single-purpose example app.
 - [x] Validate checkpoint files before reuse.
 - [x] Add retry controls for failed conditions.
 - [ ] Add background R job support for local desktop runs.
-- [ ] Add condition sharding for SLURM and other HPC schedulers.
+- [x] Add condition sharding for SLURM and other HPC schedulers.
 
 ## 4. Reporting And Reproducibility
 
@@ -51,7 +51,7 @@ simulation platform rather than a single-purpose example app.
 - [x] Add run manifests to Quarto exports.
 - [x] Add Word-ready and HTML-ready APA tables.
 - [x] Generate methods text from the simulation specification.
-- [ ] Include warnings and failed-condition summaries in reports.
+- [x] Include warnings and failed-condition summaries in reports.
 
 ## 5. Package Quality
 

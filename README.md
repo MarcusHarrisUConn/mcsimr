@@ -158,6 +158,27 @@ retry_failed_conditions(
 )
 ```
 
+For HPC work, the condition grid can be split into deterministic shards. Each
+shard keeps the original condition IDs but writes to its own checkpoint/output
+subfolder, which is friendlier for SLURM array jobs:
+
+```r
+condition_shards(spec, shards = 8)
+
+study <- run_simulation_shard(
+  spec,
+  shard_id = 1,
+  shards = 8,
+  workers = 8,
+  checkpoint_dir = "results/checkpoints/sem-shards",
+  output_dir = "results/sem-shards"
+)
+
+all_raw <- collect_checkpoint_results("results/checkpoints/sem-shards")
+run_failure_summary(study$run_manifest)
+runtime_estimate_from_manifest(study$run_manifest)
+```
+
 ## Run an OLS simulation
 
 ```r
@@ -258,7 +279,8 @@ The exported project contains:
 - `run.R`;
 - an `R/` helper folder;
 - a `results/` folder for raw results, metric summaries, APA-style table
-  markdown, the run manifest, raw LaTeX model equations, and figures.
+  markdown, the run manifest, failure summary, runtime estimate, raw LaTeX
+  model equations, and figures.
   The main run script also writes APA HTML/Word-ready tables and generated
   methods text.
 
@@ -325,6 +347,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for the current high-impact SEM workben
 - [x] First progress log and run dashboard
 - [x] Persistent condition-level run manifest
 - [x] Safer resume/restart controls
+- [x] Failed-condition summaries and pilot-based runtime estimates
 - [ ] Batch-size controls for very large replication counts
 - [x] Generic lavaan parameter condition grid
 - [x] Bollen Political Democracy example preset
@@ -360,7 +383,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for the current high-impact SEM workben
 - [ ] `targets` plus scheduler examples
 - [x] SEM `targets` example
 - [x] SLURM template
-- [ ] condition sharding
+- [x] condition sharding
 - [x] checkpoint validation
 - [ ] reproducible environment lockfiles
 

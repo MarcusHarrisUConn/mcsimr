@@ -77,6 +77,17 @@ if (exists("run_manifest") && nrow(run_manifest)) {
 }
 ```
 
+## Long-Run Status
+
+```{r}
+if (exists("failure_summary") && nrow(failure_summary)) {
+  failure_summary
+}
+if (exists("runtime_estimate") && nrow(runtime_estimate)) {
+  runtime_estimate
+}
+```
+
 ## Visualizations
 
 ```{r}

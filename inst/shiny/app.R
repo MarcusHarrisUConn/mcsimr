@@ -695,7 +695,7 @@ ui <- page_sidebar(
     nav_panel(
       "Run Dashboard",
       layout_columns(
-        col_widths = c(4, 8, 12),
+        col_widths = c(4, 8, 6, 6, 12),
         card(
           card_header("Current run"),
           uiOutput("run_status_cards"),
@@ -705,6 +705,14 @@ ui <- page_sidebar(
         card(
           card_header("Run log"),
           tableOutput("run_log")
+        ),
+        card(
+          card_header("Failure summary"),
+          tableOutput("failure_summary")
+        ),
+        card(
+          card_header("Runtime estimate"),
+          tableOutput("runtime_estimate")
         ),
         card(
           card_header("Condition manifest"),
@@ -1113,6 +1121,30 @@ server <- function(input, output, session) {
     current[, keep, drop = FALSE]
   }, striped = TRUE, bordered = TRUE)
 
+  output$failure_summary <- renderTable({
+    current <- manifest()
+    if (!nrow(current)) {
+      current <- read_run_manifest(input$checkpoint_dir)
+    }
+    out <- run_failure_summary(current)
+    if (!nrow(out)) {
+      return(data.frame(message = "No manifest has been written yet.", stringsAsFactors = FALSE))
+    }
+    out
+  }, striped = TRUE, bordered = TRUE, digits = 2)
+
+  output$runtime_estimate <- renderTable({
+    current <- manifest()
+    if (!nrow(current)) {
+      current <- read_run_manifest(input$checkpoint_dir)
+    }
+    out <- runtime_estimate_from_manifest(current)
+    if (!nrow(out)) {
+      return(data.frame(message = "Run a pilot or refresh the manifest to estimate time.", stringsAsFactors = FALSE))
+    }
+    out
+  }, striped = TRUE, bordered = TRUE, digits = 2)
+
   output$run_status_cards <- renderUI({
     current <- run_log()
     last <- if (nrow(current)) current[nrow(current), , drop = FALSE] else NULL
@@ -1220,6 +1252,8 @@ server <- function(input, output, session) {
           "summary <- study$summary",
           "apa_table <- study$apa_tables",
           "run_manifest <- study$run_manifest",
+          "failure_summary <- study$failure_summary",
+          "runtime_estimate <- study$runtime_estimate",
           "methods_text <- study$methods_text",
           "equations_latex <- study$equations_latex",
           sep = "\n"
@@ -1281,6 +1315,8 @@ server <- function(input, output, session) {
         "summary <- study$summary",
         "apa_table <- study$apa_tables",
         "run_manifest <- study$run_manifest",
+        "failure_summary <- study$failure_summary",
+        "runtime_estimate <- study$runtime_estimate",
         "methods_text <- study$methods_text",
         "equations_latex <- study$equations_latex",
         sep = "\n"

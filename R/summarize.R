@@ -270,6 +270,12 @@ plot_metric <- function(summary,
   }
 
   y <- dat[[metric]]
+  if (!any(is.finite(y))) {
+    graphics::plot.new()
+    graphics::title(main = paste("Monte Carlo", metric))
+    graphics::text(0.5, 0.5, paste("No finite", metric, "values available."))
+    return(invisible(path))
+  }
   graphics::plot(
     dat$n, y,
     type = "n",

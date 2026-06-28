@@ -40,6 +40,8 @@ export_quarto_project <- function(spec,
     "summary <- study$summary",
     "apa_table <- study$apa_tables",
     "run_manifest <- study$run_manifest",
+    "failure_summary <- study$failure_summary",
+    "runtime_estimate <- study$runtime_estimate",
     "methods_text <- study$methods_text",
     "equations_latex <- study$equations_latex",
     "writeLines(equations_latex, 'results/model-equations.tex')",
@@ -47,7 +49,9 @@ export_quarto_project <- function(spec,
     "write_apa_html(apa_table, 'results/apa-table.html')",
     "write_apa_word(apa_table, 'results/apa-table.doc')",
     "writeLines(methods_text, 'results/methods-text.md')",
-    "if (nrow(run_manifest)) utils::write.csv(run_manifest, 'results/run-manifest.csv', row.names = FALSE)"
+    "if (nrow(run_manifest)) utils::write.csv(run_manifest, 'results/run-manifest.csv', row.names = FALSE)",
+    "if (nrow(failure_summary)) utils::write.csv(failure_summary, 'results/failure-summary.csv', row.names = FALSE)",
+    "if (nrow(runtime_estimate)) utils::write.csv(runtime_estimate, 'results/runtime-estimate.csv', row.names = FALSE)"
   ), file.path(path, "run.R"))
 
   invisible(normalizePath(path, winslash = "/", mustWork = FALSE))

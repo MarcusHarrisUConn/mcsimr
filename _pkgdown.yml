@@ -38,10 +38,13 @@ reference:
   - title: Run simulations
     contents:
       - run_simulation_study
+      - run_simulation_shard
       - run_ols_simulation
       - run_sem_simulation
       - retry_failed_conditions
       - available_cores
+      - condition_shards
+      - collect_checkpoint_results
   - title: Summaries and output
     contents:
       - summarize_ols_results
@@ -53,6 +56,8 @@ reference:
       - write_apa_html
       - write_apa_word
       - simulation_methods_text
+      - run_failure_summary
+      - runtime_estimate_from_manifest
   - title: Reproducibility
     contents:
       - export_quarto_project
