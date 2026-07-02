@@ -4,7 +4,10 @@ test_that("publication helpers create reviewer-facing artifacts", {
     reps = 2,
     betas = c(0.20, 0.00),
     predictor_correlation = 0,
-    error_sd = 1
+    error_sd = 1,
+    design_rationale = "Short pilot design for testing rationale capture.",
+    metric_rationale = "Use core recovery metrics for package tests.",
+    interpretation_plan = "Confirm artifacts are generated before interpreting estimates."
   )
   results <- run_ols_simulation(spec, workers = 1)
   summary <- summarize_ols_results(results)
@@ -24,6 +27,8 @@ test_that("publication helpers create reviewer-facing artifacts", {
   expect_true(any(diagnostics$check == "replications"))
   expect_true(all(c("priority", "area", "recommendation", "rationale") %in% names(recommendations)))
   expect_true(grepl("Recommended next steps", summary_text, fixed = TRUE))
+  expect_true(grepl("Design rationale", summary_text, fixed = TRUE))
+  expect_true(any(checklist$item == "State the interpretation plan before reviewing results."))
 
   path <- tempfile(fileext = ".yml")
   write_reproducibility_manifest(manifest, path)

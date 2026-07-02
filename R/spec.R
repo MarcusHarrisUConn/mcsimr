@@ -3,6 +3,30 @@ available_cores <- function(reserve = 1L) {
   max(1L, as.integer(cores[[1L]]) - as.integer(reserve))
 }
 
+default_design_rationale <- function(model = c("ols", "sem")) {
+  model <- match.arg(model)
+  if (identical(model, "sem")) {
+    return("Sample size, estimator, missingness, nonnormality, and parameter conditions were selected to evaluate SEM performance across theoretically relevant design scenarios.")
+  }
+  "Sample size, predictor correlation, and residual SD conditions were selected to evaluate estimator performance across realistic design scenarios."
+}
+
+default_metric_rationale <- function(model = c("ols", "sem")) {
+  model <- match.arg(model)
+  if (identical(model, "sem")) {
+    return("Bias, precision, coverage, convergence, improper solutions, and fit indices summarize parameter recovery and model performance.")
+  }
+  "Bias, precision, coverage, rejection behavior, and convergence summarize parameter recovery and inferential performance."
+}
+
+default_interpretation_plan <- function(model = c("ols", "sem")) {
+  model <- match.arg(model)
+  if (identical(model, "sem")) {
+    return("Interpret results by condition, emphasizing whether conclusions are robust across sample size, missingness, nonnormality, and parameter values.")
+  }
+  "Interpret results by comparing performance metrics across conditions and tying patterns back to the research question."
+}
+
 ols_sim_spec <- function(n = c(100, 250, 500),
                          reps = 1000,
                          betas = c(0.20, 0.30, 0.00),
@@ -14,7 +38,10 @@ ols_sim_spec <- function(n = c(100, 250, 500),
                          fitted_formula = NULL,
                          metrics = default_metrics("ols"),
                          study_name = "OLS Monte Carlo Simulation",
-                         research_question = "How does OLS coefficient recovery vary across sample sizes?") {
+                         research_question = "How does OLS coefficient recovery vary across sample sizes?",
+                         design_rationale = default_design_rationale("ols"),
+                         metric_rationale = default_metric_rationale("ols"),
+                         interpretation_plan = default_interpretation_plan("ols")) {
   stopifnot(length(n) >= 1L, all(n > 1L))
   stopifnot(length(betas) >= 1L)
   stopifnot(reps >= 1L)
@@ -35,6 +62,9 @@ ols_sim_spec <- function(n = c(100, 250, 500),
     type = "ols",
     study_name = study_name,
     research_question = research_question,
+    design_rationale = as.character(design_rationale),
+    metric_rationale = as.character(metric_rationale),
+    interpretation_plan = as.character(interpretation_plan),
     n = as.integer(n),
     reps = as.integer(reps),
     betas = as.numeric(betas),
@@ -94,7 +124,10 @@ sem_sim_spec <- function(population_model,
                          seed = 20260608,
                          metrics = default_metrics("sem"),
                          study_name = "lavaan Monte Carlo Simulation",
-                         research_question = "How does SEM parameter recovery vary across sample sizes?") {
+                         research_question = "How does SEM parameter recovery vary across sample sizes?",
+                         design_rationale = default_design_rationale("sem"),
+                         metric_rationale = default_metric_rationale("sem"),
+                         interpretation_plan = default_interpretation_plan("sem")) {
   stopifnot(length(population_model) == 1L, nzchar(population_model))
   stopifnot(length(fitted_model) == 1L, nzchar(fitted_model))
   stopifnot(length(n) >= 1L, all(n > 1L))
@@ -140,6 +173,9 @@ sem_sim_spec <- function(population_model,
     type = "sem",
     study_name = study_name,
     research_question = research_question,
+    design_rationale = as.character(design_rationale),
+    metric_rationale = as.character(metric_rationale),
+    interpretation_plan = as.character(interpretation_plan),
     population_model = population_model,
     fitted_model = fitted_model,
     n = as.integer(n),

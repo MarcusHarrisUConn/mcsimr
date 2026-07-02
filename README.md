@@ -92,7 +92,10 @@ spec <- sem_sim_spec(
   kurtosis = c(0, 2),
   std_lv = TRUE,
   alpha = 0.05,
-  seed = 20260608
+  seed = 20260608,
+  design_rationale = "Vary sample size, missingness, nonnormality, and focal parameters to evaluate SEM recovery under realistic applied conditions.",
+  metric_rationale = "Bias, RMSE, coverage, convergence, improper solutions, and fit indices summarize estimation and inferential performance.",
+  interpretation_plan = "Interpret results by condition and emphasize patterns that remain stable across design factors."
 )
 
 sem_model_parameters(preset$population_model)

@@ -4,6 +4,9 @@
 \alias{apa_metric_table}
 \alias{collect_checkpoint_results}
 \alias{condition_shards}
+\alias{default_design_rationale}
+\alias{default_interpretation_plan}
+\alias{default_metric_rationale}
 \alias{default_metrics}
 \alias{export_quarto_project}
 \alias{metric_catalog}
@@ -65,12 +68,21 @@ metric_catalog(model = c("ols", "sem"))
 
 default_metrics(model = c("ols", "sem"))
 
+default_design_rationale(model = c("ols", "sem"))
+
+default_metric_rationale(model = c("ols", "sem"))
+
+default_interpretation_plan(model = c("ols", "sem"))
+
 ols_sim_spec(n = c(100, 250, 500), reps = 1000,
   betas = c(0.20, 0.30, 0.00), intercept = 0,
   predictor_correlation = 0, error_sd = 1, alpha = 0.05,
   seed = 20260608, fitted_formula = NULL,
   metrics = default_metrics("ols"), study_name = "OLS Monte Carlo Simulation",
-  research_question = "How does OLS coefficient recovery vary across sample sizes?")
+  research_question = "How does OLS coefficient recovery vary across sample sizes?",
+  design_rationale = default_design_rationale("ols"),
+  metric_rationale = default_metric_rationale("ols"),
+  interpretation_plan = default_interpretation_plan("ols"))
 
 sem_sim_spec(population_model, fitted_model = population_model,
   n = c(100, 250, 500), reps = 1000, estimator = "ML",
@@ -82,7 +94,10 @@ sem_sim_spec(population_model, fitted_model = population_model,
   std_lv = TRUE, alpha = 0.05, seed = 20260608,
   metrics = default_metrics("sem"),
   study_name = "lavaan Monte Carlo Simulation",
-  research_question = "How does SEM parameter recovery vary across sample sizes?")
+  research_question = "How does SEM parameter recovery vary across sample sizes?",
+  design_rationale = default_design_rationale("sem"),
+  metric_rationale = default_metric_rationale("sem"),
+  interpretation_plan = default_interpretation_plan("sem"))
 
 sem_model_presets()
 
@@ -205,6 +220,9 @@ use_mcsimr_app(...)
 \item{metrics}{Metrics to include in summaries and APA-style tables.}
 \item{study_name}{Human-readable study name.}
 \item{research_question}{Human-readable motivating question.}
+\item{design_rationale}{Human-readable rationale for selected simulation conditions.}
+\item{metric_rationale}{Human-readable rationale for selected performance metrics.}
+\item{interpretation_plan}{Human-readable plan for interpreting results before inspecting them.}
 \item{population_model}{lavaan syntax used to generate simulated data.}
 \item{fitted_model}{lavaan syntax fitted to each simulated data set.}
 \item{estimator}{lavaan estimator condition or conditions.}

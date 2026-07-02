@@ -22,7 +22,7 @@ publication_checklist <- function(spec) {
   data.frame(
     section = c(
       "Research question", "Design", "Design", "Reproducibility",
-      "Reproducibility", "Evaluation", "Reporting", "Reporting"
+      "Reproducibility", "Evaluation", "Evaluation", "Reporting", "Reporting"
     ),
     item = c(
       "State the substantive or methodological question.",
@@ -31,26 +31,29 @@ publication_checklist <- function(spec) {
       "Record the seed, software versions, and package versions.",
       "Archive raw results, summaries, checkpoints, and code.",
       "Define performance metrics before interpreting results.",
+      "State the interpretation plan before reviewing results.",
       "Report convergence, failures, and inadmissible estimates.",
       "Tie conclusions to the research question and design limits."
     ),
     status = c(
       if (nzchar(spec$research_question)) "complete" else "review",
       "complete",
-      "review",
+      if (!is.null(spec$design_rationale) && nzchar(spec$design_rationale)) "complete" else "review",
       if (!is.null(spec$seed) && is.finite(spec$seed)) "complete" else "review",
       "complete",
-      if (length(spec$metrics)) "complete" else "review",
+      if (length(spec$metrics) && !is.null(spec$metric_rationale) && nzchar(spec$metric_rationale)) "complete" else "review",
+      if (!is.null(spec$interpretation_plan) && nzchar(spec$interpretation_plan)) "complete" else "review",
       "complete",
       "review"
     ),
     detail = c(
       spec$research_question,
       model_detail,
-      condition_detail,
+      paste(condition_detail, spec$design_rationale),
       paste("Base random seed:", spec$seed),
       "Exported studies write raw results, metric summaries, manifests, methods text, tables, figures, and reproducibility metadata.",
-      paste("Requested metrics:", paste(spec$metrics, collapse = ", ")),
+      paste("Requested metrics:", paste(spec$metrics, collapse = ", "), "|", spec$metric_rationale),
+      spec$interpretation_plan,
       "Use simulation_diagnostics() and run manifests to identify fragile conditions.",
       reps_detail
     ),
@@ -96,6 +99,9 @@ reproducibility_manifest <- function(spec, raw_results = NULL, summary = NULL) {
     study_name = spec$study_name,
     study_type = spec$type,
     research_question = spec$research_question,
+    design_rationale = spec$design_rationale,
+    metric_rationale = spec$metric_rationale,
+    interpretation_plan = spec$interpretation_plan,
     seed = spec$seed,
     spec_checksum = object_checksum(spec),
     raw_results_rows = if (is.null(raw_results)) NA_integer_ else nrow(raw_results),
@@ -288,6 +294,9 @@ publication_summary_text <- function(spec, diagnostics, checklist = NULL, recomm
       spec$reps, " replication(s) per condition, alpha = ", spec$alpha,
       ", and seed = ", spec$seed, "."
     ),
+    paste0("Design rationale: ", spec$design_rationale),
+    paste0("Metric rationale: ", spec$metric_rationale),
+    paste0("Interpretation plan: ", spec$interpretation_plan),
     paste0("Automated publication diagnostics were summarized as: ", severity_counts, "."),
     paste0("Recommended next steps: ", top_recommendations),
     sep = "\n\n"

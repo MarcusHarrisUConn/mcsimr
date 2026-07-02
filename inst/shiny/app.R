@@ -510,6 +510,9 @@ ui <- page_sidebar(
     selectInput("simulation_type", "Simulation family", choices = c("lavaan SEM" = "sem", "OLS regression" = "ols")),
     textInput("study_name", "Study name", "lavaan Monte Carlo Simulation"),
     textAreaInput("research_question", "Research question", "How does SEM parameter recovery vary across sample sizes?", rows = 3),
+    textAreaInput("design_rationale", "Design rationale", "Sample size, estimator, missingness, nonnormality, and parameter conditions were selected to evaluate SEM performance across theoretically relevant design scenarios.", rows = 3),
+    textAreaInput("metric_rationale", "Metric rationale", "Bias, precision, coverage, convergence, improper solutions, and fit indices summarize parameter recovery and model performance.", rows = 3),
+    textAreaInput("interpretation_plan", "Interpretation plan", "Interpret results by condition, emphasizing whether conclusions are robust across sample size, missingness, nonnormality, and parameter values.", rows = 3),
     textInput("n", "Sample sizes", "100, 250, 500"),
     numericInput("reps", "Replications per condition", 100, min = 1, step = 10),
     numericInput("alpha", "Alpha", 0.05, min = 0.001, max = 0.25, step = 0.001),
@@ -1034,7 +1037,10 @@ server <- function(input, output, session) {
         seed = input$seed,
         metrics = default_metrics("sem"),
         study_name = input$study_name,
-        research_question = input$research_question
+        research_question = input$research_question,
+        design_rationale = input$design_rationale,
+        metric_rationale = input$metric_rationale,
+        interpretation_plan = input$interpretation_plan
       )
     } else {
       ols_sim_spec(
@@ -1048,7 +1054,10 @@ server <- function(input, output, session) {
         fitted_formula = input$fitted_formula,
         metrics = default_metrics("ols"),
         study_name = input$study_name,
-        research_question = input$research_question
+        research_question = input$research_question,
+        design_rationale = input$design_rationale,
+        metric_rationale = input$metric_rationale,
+        interpretation_plan = input$interpretation_plan
       )
     }
   })
@@ -1369,7 +1378,10 @@ server <- function(input, output, session) {
           "  alpha = %s,",
           "  seed = %s,",
           "  study_name = %s,",
-          "  research_question = %s",
+          "  research_question = %s,",
+          "  design_rationale = %s,",
+          "  metric_rationale = %s,",
+          "  interpretation_plan = %s",
           ")",
           "",
           "study <- run_simulation_study(",
@@ -1418,6 +1430,9 @@ server <- function(input, output, session) {
         input$seed,
         deparse(input$study_name),
         deparse(input$research_question),
+        deparse(input$design_rationale),
+        deparse(input$metric_rationale),
+        deparse(input$interpretation_plan),
         active_workers(),
         deparse(input$checkpoint_dir)
       ))
@@ -1437,7 +1452,10 @@ server <- function(input, output, session) {
         "  seed = %s,",
         "  fitted_formula = %s,",
         "  study_name = %s,",
-        "  research_question = %s",
+        "  research_question = %s,",
+        "  design_rationale = %s,",
+        "  metric_rationale = %s,",
+        "  interpretation_plan = %s",
         ")",
         "",
         "study <- run_simulation_study(",
@@ -1470,6 +1488,9 @@ server <- function(input, output, session) {
       deparse(input$fitted_formula),
       deparse(input$study_name),
       deparse(input$research_question),
+      deparse(input$design_rationale),
+      deparse(input$metric_rationale),
+      deparse(input$interpretation_plan),
       active_workers(),
       deparse(input$checkpoint_dir)
     )
