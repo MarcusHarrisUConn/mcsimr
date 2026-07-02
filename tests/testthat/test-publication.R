@@ -13,6 +13,7 @@ test_that("publication helpers create reviewer-facing artifacts", {
   summary <- summarize_ols_results(results)
 
   checklist <- publication_checklist(spec)
+  readiness <- simulation_readiness(spec, mode = "publication")
   manifest <- reproducibility_manifest(spec, raw_results = results, summary = summary)
   diagnostics <- simulation_diagnostics(results, summary, spec = spec)
   recommendations <- publication_recommendations(diagnostics, checklist)
@@ -20,6 +21,8 @@ test_that("publication helpers create reviewer-facing artifacts", {
 
   expect_true(all(c("section", "item", "status", "detail") %in% names(checklist)))
   expect_true(any(checklist$status == "review"))
+  expect_true(all(c("mode", "level", "check", "message", "action") %in% names(readiness)))
+  expect_true(any(readiness$level == "warning"))
   expect_equal(manifest$study_type, "ols")
   expect_true(nzchar(manifest$spec_checksum))
   expect_equal(manifest$raw_results_rows, nrow(results))
@@ -56,11 +59,13 @@ test_that("simulation study writes publication artifacts", {
 
   expect_true(nrow(study$diagnostics) > 0)
   expect_true(nrow(study$reporting_checklist) > 0)
+  expect_true(nrow(study$readiness) > 0)
   expect_true(is.list(study$reproducibility))
   expect_true(nrow(study$publication_recommendations) > 0)
   expect_true(nzchar(study$publication_summary))
   expect_true(file.exists(file.path(output_dir, "diagnostics.csv")))
   expect_true(file.exists(file.path(output_dir, "reporting-checklist.csv")))
+  expect_true(file.exists(file.path(output_dir, "readiness.csv")))
   expect_true(file.exists(file.path(output_dir, "reproducibility.yml")))
   expect_true(file.exists(file.path(output_dir, "publication-recommendations.csv")))
   expect_true(file.exists(file.path(output_dir, "publication-summary.md")))

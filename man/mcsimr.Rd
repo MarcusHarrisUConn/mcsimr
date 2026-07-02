@@ -48,6 +48,7 @@
 \alias{use_mcsimr_app}
 \alias{simulation_methods_text}
 \alias{simulation_diagnostics}
+\alias{simulation_readiness}
 \alias{validate_simulation_design}
 \alias{write_apa_html}
 \alias{write_apa_tables}
@@ -82,7 +83,8 @@ ols_sim_spec(n = c(100, 250, 500), reps = 1000,
   research_question = "How does OLS coefficient recovery vary across sample sizes?",
   design_rationale = default_design_rationale("ols"),
   metric_rationale = default_metric_rationale("ols"),
-  interpretation_plan = default_interpretation_plan("ols"))
+  interpretation_plan = default_interpretation_plan("ols"),
+  readiness_mode = c("teaching", "publication"))
 
 sem_sim_spec(population_model, fitted_model = population_model,
   n = c(100, 250, 500), reps = 1000, estimator = "ML",
@@ -97,7 +99,8 @@ sem_sim_spec(population_model, fitted_model = population_model,
   research_question = "How does SEM parameter recovery vary across sample sizes?",
   design_rationale = default_design_rationale("sem"),
   metric_rationale = default_metric_rationale("sem"),
-  interpretation_plan = default_interpretation_plan("sem"))
+  interpretation_plan = default_interpretation_plan("sem"),
+  readiness_mode = c("teaching", "publication"))
 
 sem_model_presets()
 
@@ -188,6 +191,8 @@ write_reproducibility_manifest(manifest, path)
 
 simulation_diagnostics(results, summary, spec = NULL)
 
+simulation_readiness(spec, mode = NULL)
+
 plot_metric(summary, metric = "bias", term = NULL, path = NULL,
   width = 900, height = 650)
 
@@ -223,6 +228,7 @@ use_mcsimr_app(...)
 \item{design_rationale}{Human-readable rationale for selected simulation conditions.}
 \item{metric_rationale}{Human-readable rationale for selected performance metrics.}
 \item{interpretation_plan}{Human-readable plan for interpreting results before inspecting them.}
+\item{readiness_mode}{Readiness standard used for design checks. Use \code{"teaching"} for pilots and classroom use or \code{"publication"} for stricter manuscript-oriented review.}
 \item{population_model}{lavaan syntax used to generate simulated data.}
 \item{fitted_model}{lavaan syntax fitted to each simulated data set.}
 \item{estimator}{lavaan estimator condition or conditions.}
@@ -268,6 +274,7 @@ use_mcsimr_app(...)
 \item{checklist}{Optional checklist data frame created by \code{publication_checklist()}.}
 \item{recommendations}{Optional recommendations data frame created by \code{publication_recommendations()}.}
 \item{text}{Publication summary text.}
+\item{mode}{Optional readiness mode, either \code{"teaching"} or \code{"publication"}.}
 \item{metric}{Metric to plot.}
 \item{term}{Optional parameter term filter for plots.}
 \item{path}{Export destination for a Quarto project, plot, table, or manifest.}

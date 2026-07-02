@@ -5,6 +5,7 @@
 ^cran-comments[.]md$
 ^docs$
 ^examples$
+^dev$
 ^LICENSE[.]md$
 ^scripts$
 ^.*[.]Rcheck$

@@ -41,7 +41,9 @@ ols_sim_spec <- function(n = c(100, 250, 500),
                          research_question = "How does OLS coefficient recovery vary across sample sizes?",
                          design_rationale = default_design_rationale("ols"),
                          metric_rationale = default_metric_rationale("ols"),
-                         interpretation_plan = default_interpretation_plan("ols")) {
+                         interpretation_plan = default_interpretation_plan("ols"),
+                         readiness_mode = c("teaching", "publication")) {
+  readiness_mode <- match.arg(readiness_mode)
   stopifnot(length(n) >= 1L, all(n > 1L))
   stopifnot(length(betas) >= 1L)
   stopifnot(reps >= 1L)
@@ -65,6 +67,7 @@ ols_sim_spec <- function(n = c(100, 250, 500),
     design_rationale = as.character(design_rationale),
     metric_rationale = as.character(metric_rationale),
     interpretation_plan = as.character(interpretation_plan),
+    readiness_mode = readiness_mode,
     n = as.integer(n),
     reps = as.integer(reps),
     betas = as.numeric(betas),
@@ -127,7 +130,9 @@ sem_sim_spec <- function(population_model,
                          research_question = "How does SEM parameter recovery vary across sample sizes?",
                          design_rationale = default_design_rationale("sem"),
                          metric_rationale = default_metric_rationale("sem"),
-                         interpretation_plan = default_interpretation_plan("sem")) {
+                         interpretation_plan = default_interpretation_plan("sem"),
+                         readiness_mode = c("teaching", "publication")) {
+  readiness_mode <- match.arg(readiness_mode)
   stopifnot(length(population_model) == 1L, nzchar(population_model))
   stopifnot(length(fitted_model) == 1L, nzchar(fitted_model))
   stopifnot(length(n) >= 1L, all(n > 1L))
@@ -176,6 +181,7 @@ sem_sim_spec <- function(population_model,
     design_rationale = as.character(design_rationale),
     metric_rationale = as.character(metric_rationale),
     interpretation_plan = as.character(interpretation_plan),
+    readiness_mode = readiness_mode,
     population_model = population_model,
     fitted_model = fitted_model,
     n = as.integer(n),

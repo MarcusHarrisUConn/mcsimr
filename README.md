@@ -129,6 +129,7 @@ cat(paste(study$apa_tables$markdown, collapse = "\n"))
 work. In addition to raw simulation results, each `run_simulation_study()`
 bundle includes:
 
+- `readiness`: mode-aware teaching/publication checks before interpreting a run;
 - `diagnostics`: convergence, failure, coverage, Monte Carlo error, replication,
   and inadmissible-solution checks that identify fragile design cells;
 - `reporting_checklist`: reviewer-facing items students should address before

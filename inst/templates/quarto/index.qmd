@@ -96,6 +96,14 @@ if (exists("diagnostics") && nrow(diagnostics)) {
 }
 ```
 
+## Readiness Review
+
+```{r}
+if (exists("readiness") && nrow(readiness)) {
+  readiness
+}
+```
+
 ## Recommended Next Steps
 
 ```{r}

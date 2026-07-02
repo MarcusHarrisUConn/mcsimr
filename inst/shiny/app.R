@@ -508,6 +508,7 @@ ui <- page_sidebar(
   sidebar = sidebar(
     tags$div(class = "theme-switch", checkboxInput("theme_dark", "Dark mode", FALSE)),
     selectInput("simulation_type", "Simulation family", choices = c("lavaan SEM" = "sem", "OLS regression" = "ols")),
+    selectInput("readiness_mode", "Readiness mode", choices = c("Teaching / pilot" = "teaching", "Publication" = "publication")),
     textInput("study_name", "Study name", "lavaan Monte Carlo Simulation"),
     textAreaInput("research_question", "Research question", "How does SEM parameter recovery vary across sample sizes?", rows = 3),
     textAreaInput("design_rationale", "Design rationale", "Sample size, estimator, missingness, nonnormality, and parameter conditions were selected to evaluate SEM performance across theoretically relevant design scenarios.", rows = 3),
@@ -648,6 +649,10 @@ ui <- page_sidebar(
           tableOutput("design_validation")
         ),
         card(
+          card_header("Readiness review"),
+          tableOutput("readiness_review")
+        ),
+        card(
           card_header("Model parameters to vary"),
           tags$div(class = "parameter-picker", uiOutput("candidate_parameter_ui")),
           layout_columns(
@@ -735,6 +740,10 @@ ui <- page_sidebar(
         card(
           card_header("Automated diagnostics"),
           tableOutput("diagnostics")
+        ),
+        card(
+          card_header("Readiness review"),
+          tableOutput("publication_readiness")
         ),
         card(
           card_header("Diagnostic plot"),
@@ -1040,7 +1049,8 @@ server <- function(input, output, session) {
         research_question = input$research_question,
         design_rationale = input$design_rationale,
         metric_rationale = input$metric_rationale,
-        interpretation_plan = input$interpretation_plan
+        interpretation_plan = input$interpretation_plan,
+        readiness_mode = input$readiness_mode
       )
     } else {
       ols_sim_spec(
@@ -1057,7 +1067,8 @@ server <- function(input, output, session) {
         research_question = input$research_question,
         design_rationale = input$design_rationale,
         metric_rationale = input$metric_rationale,
-        interpretation_plan = input$interpretation_plan
+        interpretation_plan = input$interpretation_plan,
+        readiness_mode = input$readiness_mode
       )
     }
   })
@@ -1090,6 +1101,10 @@ server <- function(input, output, session) {
   output$design_validation <- renderTable({
     req(identical(input$simulation_type, "sem"))
     validate_simulation_design(spec())
+  }, striped = TRUE, bordered = TRUE)
+
+  output$readiness_review <- renderTable({
+    simulation_readiness(spec(), mode = input$readiness_mode)
   }, striped = TRUE, bordered = TRUE)
 
   output$condition_grid_full <- renderTable({
@@ -1237,6 +1252,11 @@ server <- function(input, output, session) {
     study()$reproducibility
   })
 
+  current_readiness <- reactive({
+    req(study())
+    study()$readiness
+  })
+
   current_recommendations <- reactive({
     req(study())
     study()$publication_recommendations
@@ -1259,9 +1279,11 @@ server <- function(input, output, session) {
     severity_counts <- table(diagnostics$severity, useNA = "ifany")
     checklist_counts <- table(checklist$status, useNA = "ifany")
     high_priority <- sum(current_recommendations()$priority == "high", na.rm = TRUE)
+    readiness_counts <- table(current_readiness()$level, useNA = "ifany")
     tagList(
       tags$p(tags$strong("Diagnostics"), tags$br(), paste(paste(names(severity_counts), as.integer(severity_counts), sep = ": "), collapse = "; ")),
       tags$p(tags$strong("Checklist"), tags$br(), paste(paste(names(checklist_counts), as.integer(checklist_counts), sep = ": "), collapse = "; ")),
+      tags$p(tags$strong("Readiness"), tags$br(), paste(paste(names(readiness_counts), as.integer(readiness_counts), sep = ": "), collapse = "; ")),
       tags$p(tags$strong("High-priority next steps"), tags$br(), high_priority),
       tags$p(tags$strong("Spec checksum"), tags$br(), study()$reproducibility$spec_checksum),
       tags$p(tags$strong("Generated"), tags$br(), study()$reproducibility$generated_at)
@@ -1270,6 +1292,10 @@ server <- function(input, output, session) {
 
   output$diagnostics <- renderTable({
     current_diagnostics()
+  }, striped = TRUE, bordered = TRUE)
+
+  output$publication_readiness <- renderTable({
+    current_readiness()
   }, striped = TRUE, bordered = TRUE)
 
   output$diagnostics_plot <- renderPlot({
@@ -1381,7 +1407,8 @@ server <- function(input, output, session) {
           "  research_question = %s,",
           "  design_rationale = %s,",
           "  metric_rationale = %s,",
-          "  interpretation_plan = %s",
+          "  interpretation_plan = %s,",
+          "  readiness_mode = %s",
           ")",
           "",
           "study <- run_simulation_study(",
@@ -1396,6 +1423,7 @@ server <- function(input, output, session) {
           "failure_summary <- study$failure_summary",
           "runtime_estimate <- study$runtime_estimate",
           "diagnostics <- study$diagnostics",
+          "readiness <- study$readiness",
           "reporting_checklist <- study$reporting_checklist",
           "reproducibility <- study$reproducibility",
           "publication_recommendations <- study$publication_recommendations",
@@ -1433,6 +1461,7 @@ server <- function(input, output, session) {
         deparse(input$design_rationale),
         deparse(input$metric_rationale),
         deparse(input$interpretation_plan),
+        deparse(input$readiness_mode),
         active_workers(),
         deparse(input$checkpoint_dir)
       ))
@@ -1455,7 +1484,8 @@ server <- function(input, output, session) {
         "  research_question = %s,",
         "  design_rationale = %s,",
         "  metric_rationale = %s,",
-        "  interpretation_plan = %s",
+        "  interpretation_plan = %s,",
+        "  readiness_mode = %s",
         ")",
         "",
         "study <- run_simulation_study(",
@@ -1470,6 +1500,7 @@ server <- function(input, output, session) {
         "failure_summary <- study$failure_summary",
         "runtime_estimate <- study$runtime_estimate",
         "diagnostics <- study$diagnostics",
+        "readiness <- study$readiness",
         "reporting_checklist <- study$reporting_checklist",
         "reproducibility <- study$reproducibility",
         "publication_recommendations <- study$publication_recommendations",
@@ -1491,6 +1522,7 @@ server <- function(input, output, session) {
       deparse(input$design_rationale),
       deparse(input$metric_rationale),
       deparse(input$interpretation_plan),
+      deparse(input$readiness_mode),
       active_workers(),
       deparse(input$checkpoint_dir)
     )

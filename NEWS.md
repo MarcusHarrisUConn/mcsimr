@@ -22,6 +22,7 @@
 - Added publication-readiness helpers for reproducibility manifests, reviewer-facing reporting checklists, and automated simulation diagnostics.
 - Added recommendation and publication-summary helpers that turn diagnostics into next steps for students.
 - Added design, metric, and interpretation rationale fields to simulation specifications and the Shiny app.
+- Added teaching/publication readiness modes with stricter publication-oriented preliminary checks.
 - Added publication-focused plots, including metric heatmaps and diagnostic severity plots.
 - Added a Shinylive browser demo and GitHub Pages deployment.
 - Added an explicit lavaan runtime diagnostic for R sessions where CPU-core detection is unavailable.

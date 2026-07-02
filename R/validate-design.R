@@ -5,6 +5,103 @@ validate_simulation_design <- function(spec) {
   validate_ols_design(spec)
 }
 
+simulation_readiness <- function(spec, mode = NULL) {
+  if (identical(spec$type, "sem") || inherits(spec, "mcsimr_sem_spec")) {
+    validate_sem_spec(spec)
+    grid <- sem_condition_grid(spec)
+    n_parameters <- tryCatch(nrow(sem_model_parameters(spec$fitted_model)), error = function(e) NA_integer_)
+    missing_rate <- spec$missing_rate
+    mechanisms <- spec$missing_mechanism
+  } else {
+    validate_ols_spec(spec)
+    grid <- condition_grid(spec)
+    n_parameters <- length(spec$betas) + 1L
+    missing_rate <- 0
+    mechanisms <- "none"
+  }
+
+  if (is.null(mode)) {
+    mode <- if (!is.null(spec$readiness_mode)) spec$readiness_mode else "teaching"
+  }
+  mode <- match.arg(mode, c("teaching", "publication"))
+  publication <- identical(mode, "publication")
+  rows <- list()
+  add <- function(level, check, message, action) {
+    rows[[length(rows) + 1L]] <<- data.frame(
+      mode = mode,
+      level = level,
+      check = check,
+      message = message,
+      action = action,
+      stringsAsFactors = FALSE
+    )
+  }
+
+  total_fits <- nrow(grid) * spec$reps
+  min_reps <- if (publication) 500L else 100L
+  if (spec$reps < min_reps) {
+    add(
+      if (publication) "warning" else "info",
+      "replications",
+      paste("The design uses", spec$reps, "replications per condition."),
+      paste("Use at least", min_reps, "replications for", mode, "mode, or document why a smaller pilot is enough.")
+    )
+  } else {
+    add("ok", "replications", paste(spec$reps, "replications per condition."), "Replication count meets the current mode threshold.")
+  }
+
+  if (total_fits >= if (publication) 25000L else 10000L) {
+    add(
+      "warning",
+      "run size",
+      paste(total_fits, "model fits are scheduled."),
+      "Run a pilot first, keep checkpointing enabled, and consider sharding or targets for the full study."
+    )
+  } else {
+    add("ok", "run size", paste(total_fits, "model fits are scheduled."), "Run size is reasonable for the current mode.")
+  }
+
+  min_n <- min(spec$n, na.rm = TRUE)
+  if (is.finite(n_parameters) && min_n / max(1L, n_parameters) < if (publication) 10 else 5) {
+    add(
+      if (publication) "warning" else "info",
+      "sample size per parameter",
+      paste("Smallest N is", min_n, "with about", n_parameters, "model parameters."),
+      "Consider increasing the smallest sample size or simplifying the model before a final run."
+    )
+  }
+
+  missing_method <- if (is.null(spec$missing)) "none" else spec$missing
+  if (any(missing_rate > 0) && identical(tolower(missing_method), "listwise")) {
+    add("warning", "missing data", "Missingness is enabled with listwise deletion.", "Consider FIML/direct ML when appropriate for the estimand and mechanism.")
+  }
+  if ("mar" %in% mechanisms && is.null(spec$missing_driver)) {
+    add(if (publication) "warning" else "info", "MAR driver", "MAR missingness has no explicit driver variable.", "Set a driver variable so the missing-data mechanism is transparent.")
+  }
+  if (any(missing_rate >= if (publication) 0.30 else 0.40)) {
+    add("warning", "missing rate", "One or more missing-data rates are high.", "Monitor convergence, admissibility, and effective sample size by condition.")
+  }
+
+  rationale_fields <- c("research_question", "design_rationale", "metric_rationale", "interpretation_plan")
+  missing_rationale <- rationale_fields[!vapply(rationale_fields, function(field) {
+    !is.null(spec[[field]]) && nzchar(spec[[field]])
+  }, logical(1L))]
+  if (length(missing_rationale)) {
+    add(
+      if (publication) "warning" else "info",
+      "rationale",
+      paste("Missing rationale field(s):", paste(missing_rationale, collapse = ", ")),
+      "Complete these fields so the exported report explains why the design was chosen."
+    )
+  } else {
+    add("ok", "rationale", "Research question, design rationale, metric rationale, and interpretation plan are present.", "Keep these aligned with the final manuscript.")
+  }
+
+  out <- do.call(rbind, rows)
+  rownames(out) <- NULL
+  out
+}
+
 validate_ols_design <- function(spec) {
   validate_ols_spec(spec)
   rows <- list()
@@ -13,10 +110,9 @@ validate_ols_design <- function(spec) {
   }
   grid <- condition_grid(spec)
   add("ok", "condition grid", paste(nrow(grid), "condition(s) defined."))
-  if (spec$reps < 100L) {
-    add("info", "replications", "Fewer than 100 replications is best treated as a smoke test.")
-  } else {
-    add("ok", "replications", paste(spec$reps, "replications per condition."))
+  readiness <- simulation_readiness(spec)
+  for (i in seq_len(nrow(readiness))) {
+    add(readiness$level[[i]], readiness$check[[i]], readiness$message[[i]])
   }
   if (any(spec$error_sd <= 0)) {
     add("error", "residual variance", "All residual standard deviations must be positive.")
@@ -49,9 +145,6 @@ validate_sem_design <- function(spec) {
     add("error", "condition grid", conditionMessage(grid))
   } else {
     add("ok", "condition grid", paste(nrow(grid), "condition(s) defined."))
-    if (nrow(grid) * spec$reps >= 10000L) {
-      add("warning", "run size", paste(nrow(grid) * spec$reps, "model fits scheduled. Use checkpoints and HPC/targets for full runs."))
-    }
   }
 
   parameter_conditions <- normalize_sem_parameter_conditions(spec$parameter_conditions)
@@ -74,6 +167,12 @@ validate_sem_design <- function(spec) {
   }
   if (!identical(spec$misspecification, "none")) {
     add("info", "misspecification", paste("Fitted model uses preset:", spec$misspecification))
+  }
+  if (!inherits(grid, "error")) {
+    readiness <- simulation_readiness(spec)
+    for (i in seq_len(nrow(readiness))) {
+      add(readiness$level[[i]], readiness$check[[i]], readiness$message[[i]])
+    }
   }
   if (!length(rows)) {
     add("ok", "design", "The design passed basic validation.")
