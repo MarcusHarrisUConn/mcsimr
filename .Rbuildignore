@@ -1,6 +1,12 @@
 ^[.]Rproj[.]user$
 ^[.]git$
 ^[.]github$
+^_pkgdown[.]yml$
+^cran-comments[.]md$
+^docs$
+^examples$
+^LICENSE[.]md$
+^scripts$
 ^.*[.]Rcheck$
 ^app$
 ^pkgdown$

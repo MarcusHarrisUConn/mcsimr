@@ -219,6 +219,16 @@ run_simulation_study <- function(spec,
     manifest,
     total_conditions = if (is.null(condition_ids)) nrow(simulation_condition_grid(spec)) else length(condition_ids)
   )
+  diagnostics <- simulation_diagnostics(raw, summary, spec = spec)
+  reporting_checklist <- publication_checklist(spec)
+  reproducibility <- reproducibility_manifest(spec, raw_results = raw, summary = summary)
+  publication_recommendations_tbl <- publication_recommendations(diagnostics, reporting_checklist)
+  publication_summary <- publication_summary_text(
+    spec,
+    diagnostics,
+    reporting_checklist,
+    publication_recommendations_tbl
+  )
 
   bundle <- list(
     spec = spec,
@@ -229,6 +239,11 @@ run_simulation_study <- function(spec,
     run_manifest = manifest,
     failure_summary = failure_summary,
     runtime_estimate = runtime_estimate,
+    diagnostics = diagnostics,
+    reporting_checklist = reporting_checklist,
+    reproducibility = reproducibility,
+    publication_recommendations = publication_recommendations_tbl,
+    publication_summary = publication_summary,
     methods_text = simulation_methods_text(spec),
     metric_catalog = metric_catalog(spec$type),
     created_at = as.character(Sys.time())
@@ -249,11 +264,17 @@ run_simulation_study <- function(spec,
     if (nrow(bundle$runtime_estimate)) {
       utils::write.csv(bundle$runtime_estimate, file.path(output_dir, "runtime-estimate.csv"), row.names = FALSE)
     }
+    utils::write.csv(diagnostics, file.path(output_dir, "diagnostics.csv"), row.names = FALSE)
+    utils::write.csv(reporting_checklist, file.path(output_dir, "reporting-checklist.csv"), row.names = FALSE)
+    utils::write.csv(publication_recommendations_tbl, file.path(output_dir, "publication-recommendations.csv"), row.names = FALSE)
+    write_reproducibility_manifest(reproducibility, file.path(output_dir, "reproducibility.yml"))
+    write_publication_summary(publication_summary, file.path(output_dir, "publication-summary.md"))
     write_apa_tables(apa, file.path(output_dir, "apa-tables.md"))
     write_apa_html(apa, file.path(output_dir, "apa-tables.html"))
     write_apa_word(apa, file.path(output_dir, "apa-tables.doc"))
     writeLines(bundle$methods_text, file.path(output_dir, "methods-text.md"))
     save_metric_plots(summary, file.path(output_dir, "figures"))
+    save_publication_plots(summary, diagnostics, file.path(output_dir, "publication-figures"))
   }
 
   bundle

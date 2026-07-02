@@ -55,6 +55,6 @@ ols_methods_text <- function(spec) {
     "), predictor correlations (", paste(spec$predictor_correlation, collapse = ", "),
     "), and residual standard deviations (", paste(spec$error_sd, collapse = ", "),
     "). The design contained ", nrow(grid), " condition(s), with ", spec$reps,
-    " replication(s) per condition. The base random seed was ", spec$seed, "."
+    " replications per condition. The base random seed was ", spec$seed, "."
   )
 }

@@ -1,6 +1,8 @@
 source("R/spec.R")
 source("R/data-ols.R")
+source("R/manifest.R")
 source("R/run.R")
+source("R/sharding.R")
 source("R/summarize.R")
 
 spec <- ols_sim_spec(

@@ -1,5 +1,21 @@
+lavaan_runtime_available <- function() {
+  cores <- tryCatch(parallel::detectCores(), error = function(e) NA_integer_)
+  is.finite(cores) && cores >= 1L
+}
+
+lavaan_runtime_error <- function() {
+  paste(
+    "lavaan could not initialize because parallel::detectCores() did not return",
+    "a finite core count in this R session. Try running in an R session where",
+    "core detection is available, or update lavaan if a fix is available."
+  )
+}
+
 run_sem_replication <- function(spec, condition, rep_id) {
   validate_sem_spec(spec)
+  if (!lavaan_runtime_available()) {
+    return(sem_error_row(spec, condition, rep_id, lavaan_runtime_error()))
+  }
   conditioned_population <- tryCatch(
     apply_sem_parameter_conditions(
       population_model = spec$population_model,
@@ -129,7 +145,8 @@ run_sem_condition <- function(spec, condition, workers = 1L) {
         "sem_parameter_conditions", "sem_condition_column_names",
         "apply_mcar_missing", "apply_sem_missing", "resolve_missing_targets",
         "missing_probabilities", "standardize_for_missing", "sem_moment_arg",
-        "simulate_sem_data", "sem_group_sample_sizes"
+        "simulate_sem_data", "sem_group_sample_sizes",
+        "lavaan_runtime_available", "lavaan_runtime_error"
       ),
       envir = environment()
     )

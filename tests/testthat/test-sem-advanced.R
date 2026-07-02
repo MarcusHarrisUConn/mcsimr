@@ -40,7 +40,7 @@ test_that("SEM specs support group labels and design validation", {
 })
 
 test_that("SEM simulations tag parameter rows by group", {
-  skip_if_not_installed("lavaan")
+  skip_if_lavaan_runtime_unavailable()
   preset <- sem_model_preset("one_factor_cfa")
   spec <- sem_sim_spec(
     population_model = preset$population_model,

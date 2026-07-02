@@ -110,10 +110,38 @@ study <- run_simulation_study(
 
 study$summary
 study$run_manifest
+study$diagnostics
+study$reporting_checklist
+study$publication_recommendations
+study$publication_summary
+study$reproducibility
 cat(study$methods_text)
 cat(paste(study$equations_latex, collapse = "\n"))
 cat(paste(study$apa_tables$markdown, collapse = "\n"))
 ```
+
+## Publication-ready workflow
+
+`mcsimr` is intended to be useful in classrooms and in real methodological
+work. In addition to raw simulation results, each `run_simulation_study()`
+bundle includes:
+
+- `diagnostics`: convergence, failure, coverage, Monte Carlo error, replication,
+  and inadmissible-solution checks that identify fragile design cells;
+- `reporting_checklist`: reviewer-facing items students should address before
+  treating a simulation as publishable evidence;
+- `publication_recommendations`: prioritized next steps generated from the
+  diagnostics and checklist;
+- `publication_summary`: a short narrative summary for draft reports;
+- `reproducibility`: seed, R version, platform, package versions, row counts,
+  session information, and a checksum of the simulation specification.
+
+When an output directory is supplied, these are written as
+`diagnostics.csv`, `reporting-checklist.csv`, and `reproducibility.yml`.
+Publication figures are also written to `publication-figures/`, including
+line plots, heatmaps, and a diagnostic severity plot.
+The Quarto export also includes them in the generated report so a project can
+move from GUI exploration to transparent, rerunnable manuscript support.
 
 ## SEM design features
 

@@ -88,6 +88,38 @@ if (exists("runtime_estimate") && nrow(runtime_estimate)) {
 }
 ```
 
+## Publication Diagnostics
+
+```{r}
+if (exists("diagnostics") && nrow(diagnostics)) {
+  diagnostics
+}
+```
+
+## Recommended Next Steps
+
+```{r}
+if (exists("publication_recommendations") && nrow(publication_recommendations)) {
+  publication_recommendations
+}
+```
+
+## Publication Summary
+
+```{r, results='asis'}
+if (exists("publication_summary")) {
+  cat(publication_summary)
+}
+```
+
+## Reproducibility Metadata
+
+```{r}
+if (exists("reproducibility")) {
+  reproducibility[c("generated_at", "study_name", "study_type", "seed", "spec_checksum")]
+}
+```
+
 ## Visualizations
 
 ```{r}
@@ -98,13 +130,20 @@ if (dir.exists(figure_dir)) {
 }
 ```
 
+## Publication Figures
+
+```{r}
+publication_figure_dir <- "results/publication-figures"
+if (dir.exists(publication_figure_dir)) {
+  files <- list.files(publication_figure_dir, pattern = "[.]png$", full.names = TRUE)
+  knitr::include_graphics(files)
+}
+```
+
 ## Reporting Checklist
 
-- Motivating research question.
-- Prior evidence or theory motivating the selected conditions.
-- Manipulated conditions and rationale for levels.
-- Data-generating model and population values.
-- Fitted model and software details.
-- Performance metrics and interpretation standards.
-- Tables or figures for the most relevant patterns.
-- Conclusions tied back to the research question.
+```{r}
+if (exists("reporting_checklist") && nrow(reporting_checklist)) {
+  reporting_checklist
+}
+```

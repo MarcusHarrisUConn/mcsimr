@@ -684,6 +684,7 @@ ui <- page_sidebar(
         card(
           card_header("Plot controls"),
           selectInput("plot_metric", "Metric", choices = c("bias", "rmse", "coverage", "power", "type_i_error", "mean_cfi", "mean_rmsea")),
+          selectInput("plot_type", "Plot type", choices = c("Line plot" = "line", "Heatmap" = "heatmap")),
           uiOutput("plot_term_ui")
         ),
         card(
@@ -717,6 +718,51 @@ ui <- page_sidebar(
         card(
           card_header("Condition manifest"),
           tags$div(class = "condition-preview", tableOutput("run_manifest"))
+        )
+      )
+    ),
+    nav_panel(
+      "Publication Readiness",
+      layout_columns(
+        col_widths = c(4, 8, 6, 6, 12),
+        card(
+          card_header("Readiness snapshot"),
+          uiOutput("publication_status_cards")
+        ),
+        card(
+          card_header("Automated diagnostics"),
+          tableOutput("diagnostics")
+        ),
+        card(
+          card_header("Diagnostic plot"),
+          plotOutput("diagnostics_plot", height = "360px")
+        ),
+        card(
+          card_header("Recommended next steps"),
+          tableOutput("publication_recommendations")
+        ),
+        card(
+          card_header("Publication summary"),
+          verbatimTextOutput("publication_summary")
+        ),
+        card(
+          card_header("Reporting checklist"),
+          tableOutput("reporting_checklist")
+        ),
+        card(
+          card_header("Reproducibility"),
+          tableOutput("reproducibility_summary")
+        ),
+        card(
+          card_header("Download publication artifacts"),
+          layout_columns(
+            col_widths = c(4, 4, 4, 6, 6),
+            downloadButton("download_diagnostics", "Download diagnostics"),
+            downloadButton("download_checklist", "Download checklist"),
+            downloadButton("download_recommendations", "Download recommendations"),
+            downloadButton("download_summary_text", "Download summary"),
+            downloadButton("download_reproducibility", "Download reproducibility YAML")
+          )
         )
       )
     ),
@@ -1167,10 +1213,89 @@ server <- function(input, output, session) {
     )
   })
 
+  current_diagnostics <- reactive({
+    req(study())
+    study()$diagnostics
+  })
+
+  current_checklist <- reactive({
+    req(study())
+    study()$reporting_checklist
+  })
+
+  current_reproducibility <- reactive({
+    req(study())
+    study()$reproducibility
+  })
+
+  current_recommendations <- reactive({
+    req(study())
+    study()$publication_recommendations
+  })
+
+  current_publication_summary <- reactive({
+    req(study())
+    study()$publication_summary
+  })
+
   output$summary <- renderTable({
     req(study())
     study()$summary
   }, striped = TRUE, bordered = TRUE, digits = 4)
+
+  output$publication_status_cards <- renderUI({
+    req(study())
+    diagnostics <- current_diagnostics()
+    checklist <- current_checklist()
+    severity_counts <- table(diagnostics$severity, useNA = "ifany")
+    checklist_counts <- table(checklist$status, useNA = "ifany")
+    high_priority <- sum(current_recommendations()$priority == "high", na.rm = TRUE)
+    tagList(
+      tags$p(tags$strong("Diagnostics"), tags$br(), paste(paste(names(severity_counts), as.integer(severity_counts), sep = ": "), collapse = "; ")),
+      tags$p(tags$strong("Checklist"), tags$br(), paste(paste(names(checklist_counts), as.integer(checklist_counts), sep = ": "), collapse = "; ")),
+      tags$p(tags$strong("High-priority next steps"), tags$br(), high_priority),
+      tags$p(tags$strong("Spec checksum"), tags$br(), study()$reproducibility$spec_checksum),
+      tags$p(tags$strong("Generated"), tags$br(), study()$reproducibility$generated_at)
+    )
+  })
+
+  output$diagnostics <- renderTable({
+    current_diagnostics()
+  }, striped = TRUE, bordered = TRUE)
+
+  output$diagnostics_plot <- renderPlot({
+    plot_diagnostics(current_diagnostics())
+  })
+
+  output$publication_recommendations <- renderTable({
+    current_recommendations()
+  }, striped = TRUE, bordered = TRUE)
+
+  output$publication_summary <- renderText({
+    current_publication_summary()
+  })
+
+  output$reporting_checklist <- renderTable({
+    current_checklist()
+  }, striped = TRUE, bordered = TRUE)
+
+  output$reproducibility_summary <- renderTable({
+    repro <- current_reproducibility()
+    data.frame(
+      field = c("Study", "Type", "Seed", "Spec checksum", "R", "Platform", "Raw rows", "Summary rows"),
+      value = c(
+        repro$study_name,
+        repro$study_type,
+        repro$seed,
+        repro$spec_checksum,
+        repro$r$version,
+        repro$r$platform,
+        repro$raw_results_rows,
+        repro$summary_rows
+      ),
+      stringsAsFactors = FALSE
+    )
+  }, striped = TRUE, bordered = TRUE)
 
   output$apa <- renderText({
     req(study())
@@ -1199,7 +1324,11 @@ server <- function(input, output, session) {
   output$metric_plot <- renderPlot({
     req(study())
     req(input$plot_metric %in% names(study()$summary))
-    plot_metric(study()$summary, metric = input$plot_metric, term = input$plot_terms)
+    if (identical(input$plot_type, "heatmap")) {
+      plot_metric_heatmap(study()$summary, metric = input$plot_metric, term = input$plot_terms)
+    } else {
+      plot_metric(study()$summary, metric = input$plot_metric, term = input$plot_terms)
+    }
   })
 
   output$code <- renderText({
@@ -1254,6 +1383,11 @@ server <- function(input, output, session) {
           "run_manifest <- study$run_manifest",
           "failure_summary <- study$failure_summary",
           "runtime_estimate <- study$runtime_estimate",
+          "diagnostics <- study$diagnostics",
+          "reporting_checklist <- study$reporting_checklist",
+          "reproducibility <- study$reproducibility",
+          "publication_recommendations <- study$publication_recommendations",
+          "publication_summary <- study$publication_summary",
           "methods_text <- study$methods_text",
           "equations_latex <- study$equations_latex",
           sep = "\n"
@@ -1317,6 +1451,11 @@ server <- function(input, output, session) {
         "run_manifest <- study$run_manifest",
         "failure_summary <- study$failure_summary",
         "runtime_estimate <- study$runtime_estimate",
+        "diagnostics <- study$diagnostics",
+        "reporting_checklist <- study$reporting_checklist",
+        "reproducibility <- study$reproducibility",
+        "publication_recommendations <- study$publication_recommendations",
+        "publication_summary <- study$publication_summary",
         "methods_text <- study$methods_text",
         "equations_latex <- study$equations_latex",
         sep = "\n"
@@ -1344,6 +1483,41 @@ server <- function(input, output, session) {
     filename = function() "mcsimr-summary.csv",
     content = function(file) {
       utils::write.csv(study()$summary, file, row.names = FALSE)
+    }
+  )
+
+  output$download_diagnostics <- downloadHandler(
+    filename = function() "mcsimr-diagnostics.csv",
+    content = function(file) {
+      utils::write.csv(current_diagnostics(), file, row.names = FALSE)
+    }
+  )
+
+  output$download_checklist <- downloadHandler(
+    filename = function() "mcsimr-reporting-checklist.csv",
+    content = function(file) {
+      utils::write.csv(current_checklist(), file, row.names = FALSE)
+    }
+  )
+
+  output$download_recommendations <- downloadHandler(
+    filename = function() "mcsimr-publication-recommendations.csv",
+    content = function(file) {
+      utils::write.csv(current_recommendations(), file, row.names = FALSE)
+    }
+  )
+
+  output$download_summary_text <- downloadHandler(
+    filename = function() "mcsimr-publication-summary.md",
+    content = function(file) {
+      write_publication_summary(current_publication_summary(), file)
+    }
+  )
+
+  output$download_reproducibility <- downloadHandler(
+    filename = function() "mcsimr-reproducibility.yml",
+    content = function(file) {
+      write_reproducibility_manifest(current_reproducibility(), file)
     }
   )
 

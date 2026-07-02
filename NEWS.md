@@ -1,6 +1,6 @@
-# mcsimr 0.0.0.9000
+# mcsimr 0.1.0
 
-## Development version
+## First CRAN submission
 
 - Added a local Shiny workbench for designing, running, and exporting Monte Carlo simulation studies.
 - Added OLS simulation specifications with sample size, predictor correlation, residual SD, seed, replication count, checkpointing, parallel workers, and APA-style summaries.
@@ -19,4 +19,8 @@
 - Added APA HTML and Word-ready table exports.
 - Added generated methods text from the simulation specification for Quarto reports.
 - Added reproducible Quarto project export with serialized simulation specs, runnable code, APA table markdown/HTML/Word files, generated methods text, model equations, raw results, summaries, and figures.
+- Added publication-readiness helpers for reproducibility manifests, reviewer-facing reporting checklists, and automated simulation diagnostics.
+- Added recommendation and publication-summary helpers that turn diagnostics into next steps for students.
+- Added publication-focused plots, including metric heatmaps and diagnostic severity plots.
 - Added a Shinylive browser demo and GitHub Pages deployment.
+- Added an explicit lavaan runtime diagnostic for R sessions where CPU-core detection is unavailable.

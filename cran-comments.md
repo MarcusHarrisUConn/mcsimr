@@ -1,31 +1,40 @@
 ## R CMD check results
 
-Current development checks are run with:
+Local checks were run on macOS Tahoe 26.5.1, R 4.6.1:
 
 ```r
-R CMD check --no-manual --no-vignettes mcsimr_0.0.0.9000.tar.gz
+R CMD build .
+R CMD check --as-cran --no-manual mcsimr_0.1.0.tar.gz
 ```
 
-Before CRAN submission, run the full CRAN-facing check matrix:
+Result:
 
-```r
-devtools::check(remote = TRUE, manual = TRUE, incoming = TRUE)
-rhub::rhub_check()
-urlchecker::url_check()
-spelling::spell_check_package()
+- 0 errors
+- 0 warnings
+- 1 note
+
+The local check used pandoc from the installed Quarto distribution:
+`/Applications/quarto/bin/tools/aarch64`.
+
+The single note is expected for this first CRAN submission:
+
+```text
+New submission
 ```
 
-## Current status
+Additional release checks:
 
-This is a development version and has not yet been submitted to CRAN.
+- `urlchecker::url_check()`: all URLs are correct.
+- `spelling::spell_check_package()`: no spelling errors found.
 
-Known pre-submission items:
+One lavaan-dependent test is skipped on this local machine because
+`parallel::detectCores()` returns `NA`, which prevents lavaan 0.6-21 from
+initializing. The package reports this condition explicitly during SEM runs.
 
-- Confirm all examples run quickly enough for CRAN.
-- Add unit tests for SEM parameter conditions, checkpoint resume behavior, and Quarto export.
-- Run checks on Windows, macOS, and Linux.
-- Review exported Shiny app files so CRAN package size remains reasonable.
-- Confirm package title, description, and references do not overclaim beyond implemented behavior.
+## Test environments
+
+- local macOS Tahoe 26.5.1, R 4.6.1
+- GitHub Actions R-CMD-check on ubuntu-latest
 
 ## Downstream dependencies
 

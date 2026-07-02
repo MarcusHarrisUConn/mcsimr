@@ -60,10 +60,14 @@ format_apa_number <- function(x, digits = 3L) {
   )
 }
 
+default_apa_caption <- function() {
+  "Table 1\nMonte Carlo simulation performance metrics by condition and parameter."
+}
+
 apa_metric_table <- function(summary,
                              metrics = default_metrics("ols"),
                              digits = 3L,
-                             caption = "Table 1\nMonte Carlo simulation performance metrics by condition and parameter.") {
+                             caption = default_apa_caption()) {
   base_cols <- c("condition_id", "n", "predictor_correlation", "error_sd", "term", "true_value", "reps")
   base_cols <- c(base_cols, "estimator", "missing_rate", "missing_mechanism", "skewness", "kurtosis", "parameter_conditions")
   cols <- intersect(c(base_cols, metrics), names(summary))
@@ -294,13 +298,120 @@ plot_metric <- function(summary,
   invisible(path)
 }
 
+plot_metric_heatmap <- function(summary,
+                                metric = "bias",
+                                term = NULL,
+                                path = NULL,
+                                width = 900,
+                                height = 650) {
+  if (!metric %in% names(summary)) {
+    stop("Metric not found in summary: ", metric, call. = FALSE)
+  }
+  dat <- summary
+  if (!is.null(term)) {
+    dat <- dat[dat$term %in% term, , drop = FALSE]
+  }
+  if (!nrow(dat)) {
+    stop("No rows are available for the selected term(s).", call. = FALSE)
+  }
+  if (!is.null(path)) {
+    dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+    grDevices::png(path, width = width, height = height)
+    on.exit(grDevices::dev.off(), add = TRUE)
+  }
+
+  dat$display_term <- if ("term" %in% names(dat)) dat$term else paste("Condition", dat$condition_id)
+  agg <- stats::aggregate(dat[[metric]], by = list(n = dat$n, term = dat$display_term), FUN = mean, na.rm = TRUE)
+  names(agg)[[3L]] <- metric
+  x_vals <- sort(unique(agg$n))
+  y_vals <- unique(agg$term)
+  z <- matrix(NA_real_, nrow = length(x_vals), ncol = length(y_vals), dimnames = list(x_vals, y_vals))
+  for (i in seq_len(nrow(agg))) {
+    z[as.character(agg$n[[i]]), agg$term[[i]]] <- agg[[metric]][[i]]
+  }
+
+  if (!any(is.finite(z))) {
+    graphics::plot.new()
+    graphics::title(main = paste("Monte Carlo", metric, "heatmap"))
+    graphics::text(0.5, 0.5, paste("No finite", metric, "values available."))
+    return(invisible(path))
+  }
+
+  pal <- grDevices::colorRampPalette(c("#F7FBFF", "#FEE391", "#F25C54", "#7A0610"))(64)
+  graphics::image(
+    x = seq_along(x_vals),
+    y = seq_along(y_vals),
+    z = z,
+    col = pal,
+    axes = FALSE,
+    xlab = "Sample size",
+    ylab = "Parameter",
+    main = paste("Monte Carlo", metric, "heatmap")
+  )
+  graphics::axis(1, at = seq_along(x_vals), labels = x_vals)
+  graphics::axis(2, at = seq_along(y_vals), labels = y_vals, las = 2)
+  graphics::box()
+  invisible(path)
+}
+
+plot_diagnostics <- function(diagnostics,
+                             path = NULL,
+                             width = 900,
+                             height = 650) {
+  if (is.null(diagnostics) || !nrow(diagnostics)) {
+    stop("`diagnostics` must contain at least one row.", call. = FALSE)
+  }
+  if (!"severity" %in% names(diagnostics)) {
+    stop("`diagnostics` must include a `severity` column.", call. = FALSE)
+  }
+  if (!is.null(path)) {
+    dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+    grDevices::png(path, width = width, height = height)
+    on.exit(grDevices::dev.off(), add = TRUE)
+  }
+
+  levels <- c("ok", "review", "warning", "error")
+  counts <- table(factor(diagnostics$severity, levels = levels))
+  cols <- c(ok = "#2F855A", review = "#B7791F", warning = "#F25C54", error = "#7A0610")
+  graphics::barplot(
+    counts,
+    col = cols[names(counts)],
+    border = NA,
+    ylab = "Checks",
+    main = "Publication diagnostic severity"
+  )
+  invisible(path)
+}
+
 save_metric_plots <- function(summary,
                               path,
-                              metrics = intersect(c("bias", "rmse", "coverage", "power", "type_i_error"), names(summary))) {
+                              metrics = default_plot_metrics(summary)) {
   dir.create(path, recursive = TRUE, showWarnings = FALSE)
   files <- stats::setNames(file.path(path, paste0(metrics, ".png")), metrics)
   for (metric in metrics) {
     plot_metric(summary, metric = metric, path = files[[metric]])
   }
   invisible(files)
+}
+
+save_publication_plots <- function(summary,
+                                   diagnostics,
+                                   path,
+                                   metrics = default_plot_metrics(summary)) {
+  dir.create(path, recursive = TRUE, showWarnings = FALSE)
+  files <- c(
+    stats::setNames(file.path(path, paste0(metrics, "-line.png")), paste0(metrics, "_line")),
+    stats::setNames(file.path(path, paste0(metrics, "-heatmap.png")), paste0(metrics, "_heatmap")),
+    diagnostics = file.path(path, "diagnostics.png")
+  )
+  for (metric in metrics) {
+    plot_metric(summary, metric = metric, path = file.path(path, paste0(metric, "-line.png")))
+    plot_metric_heatmap(summary, metric = metric, path = file.path(path, paste0(metric, "-heatmap.png")))
+  }
+  plot_diagnostics(diagnostics, path = files[["diagnostics"]])
+  invisible(files)
+}
+
+default_plot_metrics <- function(summary) {
+  intersect(c("bias", "rmse", "coverage", "power", "type_i_error"), names(summary))
 }

@@ -9,7 +9,13 @@
 \alias{metric_catalog}
 \alias{ols_sim_spec}
 \alias{plot_metric}
+\alias{plot_diagnostics}
+\alias{plot_metric_heatmap}
+\alias{publication_checklist}
+\alias{publication_recommendations}
+\alias{publication_summary_text}
 \alias{read_run_manifest}
+\alias{reproducibility_manifest}
 \alias{run_manifest_path}
 \alias{apply_sem_misspecification}
 \alias{sem_model_latex}
@@ -28,6 +34,7 @@
 \alias{retry_failed_conditions}
 \alias{runtime_estimate_from_manifest}
 \alias{save_metric_plots}
+\alias{save_publication_plots}
 \alias{sem_condition_grid}
 \alias{sem_design_summary}
 \alias{sem_design_warnings}
@@ -37,10 +44,13 @@
 \alias{summarize_sem_results}
 \alias{use_mcsimr_app}
 \alias{simulation_methods_text}
+\alias{simulation_diagnostics}
 \alias{validate_simulation_design}
 \alias{write_apa_html}
 \alias{write_apa_tables}
 \alias{write_apa_word}
+\alias{write_publication_summary}
+\alias{write_reproducibility_manifest}
 \title{Local Monte Carlo simulation workbench}
 \description{
 Core functions for defining, running, checkpointing, summarizing, and exporting
@@ -138,7 +148,7 @@ summarize_ols_results(results, metrics = default_metrics("ols"))
 summarize_sem_results(results, metrics = default_metrics("sem"))
 
 apa_metric_table(summary, metrics = default_metrics("ols"), digits = 3L,
-  caption = "Table 1\\nMonte Carlo simulation performance metrics by condition and parameter.")
+  caption = default_apa_caption())
 
 write_apa_tables(apa_table, path)
 
@@ -148,11 +158,33 @@ write_apa_word(apa_table, path)
 
 simulation_methods_text(spec)
 
+publication_checklist(spec)
+
+publication_recommendations(diagnostics, checklist = NULL)
+
+publication_summary_text(spec, diagnostics, checklist = NULL,
+  recommendations = NULL)
+
+write_publication_summary(text, path)
+
+reproducibility_manifest(spec, raw_results = NULL, summary = NULL)
+
+write_reproducibility_manifest(manifest, path)
+
+simulation_diagnostics(results, summary, spec = NULL)
+
 plot_metric(summary, metric = "bias", term = NULL, path = NULL,
   width = 900, height = 650)
 
-save_metric_plots(summary, path,
-  metrics = intersect(c("bias", "rmse", "coverage", "power", "type_i_error"), names(summary)))
+plot_metric_heatmap(summary, metric = "bias", term = NULL, path = NULL,
+  width = 900, height = 650)
+
+plot_diagnostics(diagnostics, path = NULL, width = 900, height = 650)
+
+save_metric_plots(summary, path, metrics = default_plot_metrics(summary))
+
+save_publication_plots(summary, diagnostics, path,
+  metrics = default_plot_metrics(summary))
 
 export_quarto_project(spec, path, overwrite = FALSE, workers = 1L,
   checkpoint_dir = "results/checkpoints")
@@ -212,16 +244,21 @@ use_mcsimr_app(...)
 \item{digits}{Number of digits for APA-style numeric display.}
 \item{caption}{APA-style table caption.}
 \item{apa_table}{APA table object created by \code{apa_metric_table()}.}
+\item{raw_results}{Optional raw simulation results for reproducibility metadata.}
+\item{manifest}{Reproducibility manifest list or run manifest data frame.}
+\item{diagnostics}{Diagnostics data frame created by \code{simulation_diagnostics()}.}
+\item{checklist}{Optional checklist data frame created by \code{publication_checklist()}.}
+\item{recommendations}{Optional recommendations data frame created by \code{publication_recommendations()}.}
+\item{text}{Publication summary text.}
 \item{metric}{Metric to plot.}
 \item{term}{Optional parameter term filter for plots.}
-\item{path}{Export destination for a Quarto project.}
+\item{path}{Export destination for a Quarto project, plot, table, or manifest.}
 \item{preset}{Misspecification preset name.}
 \item{condition_ids}{Optional condition identifiers to run or retry.}
 \item{shards}{Number of shards used to split the condition grid.}
 \item{shard_id}{One-based shard identifier to run.}
 \item{strategy}{Condition-assignment strategy for sharding.}
 \item{recursive}{Whether checkpoint collection should search nested shard directories.}
-\item{manifest}{Run manifest data frame or checkpoint directory.}
 \item{total_conditions}{Optional total number of conditions for runtime estimation.}
 \item{width}{PNG width in pixels.}
 \item{height}{PNG height in pixels.}

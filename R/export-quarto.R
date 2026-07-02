@@ -42,6 +42,11 @@ export_quarto_project <- function(spec,
     "run_manifest <- study$run_manifest",
     "failure_summary <- study$failure_summary",
     "runtime_estimate <- study$runtime_estimate",
+    "diagnostics <- study$diagnostics",
+    "reporting_checklist <- study$reporting_checklist",
+    "reproducibility <- study$reproducibility",
+    "publication_recommendations <- study$publication_recommendations",
+    "publication_summary <- study$publication_summary",
     "methods_text <- study$methods_text",
     "equations_latex <- study$equations_latex",
     "writeLines(equations_latex, 'results/model-equations.tex')",
@@ -51,7 +56,13 @@ export_quarto_project <- function(spec,
     "writeLines(methods_text, 'results/methods-text.md')",
     "if (nrow(run_manifest)) utils::write.csv(run_manifest, 'results/run-manifest.csv', row.names = FALSE)",
     "if (nrow(failure_summary)) utils::write.csv(failure_summary, 'results/failure-summary.csv', row.names = FALSE)",
-    "if (nrow(runtime_estimate)) utils::write.csv(runtime_estimate, 'results/runtime-estimate.csv', row.names = FALSE)"
+    "if (nrow(runtime_estimate)) utils::write.csv(runtime_estimate, 'results/runtime-estimate.csv', row.names = FALSE)",
+    "utils::write.csv(diagnostics, 'results/diagnostics.csv', row.names = FALSE)",
+    "utils::write.csv(reporting_checklist, 'results/reporting-checklist.csv', row.names = FALSE)",
+    "utils::write.csv(publication_recommendations, 'results/publication-recommendations.csv', row.names = FALSE)",
+    "write_reproducibility_manifest(reproducibility, 'results/reproducibility.yml')",
+    "write_publication_summary(publication_summary, 'results/publication-summary.md')",
+    "save_publication_plots(summary, diagnostics, 'results/publication-figures')"
   ), file.path(path, "run.R"))
 
   invisible(normalizePath(path, winslash = "/", mustWork = FALSE))
