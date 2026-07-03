@@ -106,6 +106,7 @@ readiness_decision <- function(readiness, diagnostics = NULL, checklist = NULL) 
   if (is.null(readiness) || !nrow(readiness)) {
     return(data.frame(
       decision = "run_review",
+      decision_label = "Run the readiness review",
       level = "error",
       issues = 1L,
       message = "No readiness review was available.",
@@ -133,16 +134,19 @@ readiness_decision <- function(readiness, diagnostics = NULL, checklist = NULL) 
 
   if (high_issues > 0L) {
     decision <- "revise_before_claims"
+    decision_label <- "Revise before making claims"
     level <- "warning"
     message <- paste(high_issues, "high-priority readiness or diagnostic issue(s) should be addressed before publication claims.")
     next_step <- "Revise the design or document a defensible rationale, then rerun the affected simulation conditions."
   } else if (review_issues > 0L) {
     decision <- "pilot_or_document"
+    decision_label <- "Use as a pilot or document"
     level <- "review"
     message <- paste(review_issues, "review item(s) remain before treating this as a final study.")
     next_step <- "Use the run as a pilot or complete the rationale, reporting checklist, and interpretation notes."
   } else {
     decision <- "ready_for_publication_review"
+    decision_label <- "Ready for publication review"
     level <- "ok"
     message <- "Automated readiness, diagnostics, and checklist items did not flag unresolved issues."
     next_step <- "Proceed to manuscript review, sensitivity checks, and substantive interpretation."
@@ -150,6 +154,7 @@ readiness_decision <- function(readiness, diagnostics = NULL, checklist = NULL) 
 
   data.frame(
     decision = decision,
+    decision_label = decision_label,
     level = level,
     issues = total_issues,
     message = message,

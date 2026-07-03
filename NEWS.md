@@ -25,6 +25,7 @@
 - Added teaching/publication readiness modes with stricter publication-oriented preliminary checks.
 - Added a one-row readiness decision summary for GUI, Quarto, and manuscript workflows.
 - Added Shiny input checks, design size summaries, and readiness downloads to reduce setup confusion.
+- Added friendlier readiness labels, publication-summary readiness language, and Shiny error handling for run/export failures.
 - Added publication-focused plots, including metric heatmaps and diagnostic severity plots.
 - Added a Shinylive browser demo and GitHub Pages deployment.
 - Added an explicit lavaan runtime diagnostic for R sessions where CPU-core detection is unavailable.

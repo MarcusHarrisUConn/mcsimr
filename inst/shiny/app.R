@@ -911,6 +911,13 @@ server <- function(input, output, session) {
     ))
   }
 
+  notify_operation_error <- function(status, error) {
+    message <- conditionMessage(error)
+    append_run_log(status, message)
+    showNotification(message, type = "error", duration = NULL)
+    invisible(FALSE)
+  }
+
   active_workers <- reactive({
     if (isTRUE(input$use_parallel)) {
       max(1L, as.integer(input$workers))
@@ -1291,60 +1298,72 @@ server <- function(input, output, session) {
   }, striped = TRUE, bordered = TRUE)
 
   observeEvent(input$run, {
-    grid <- if (identical(spec()$type, "sem")) sem_condition_grid(spec()) else NULL
-    append_run_log(
-      "queued",
-      paste0(
-        "Prepared ", if (is.null(grid)) "OLS" else nrow(grid),
-        " condition", if (!is.null(grid) && nrow(grid) == 1L) "" else "s",
-        " x ", input$reps, " replications on ", active_workers(), " worker",
-        if (active_workers() == 1L) "." else "s."
+    tryCatch({
+      current_spec <- spec()
+      grid <- if (identical(current_spec$type, "sem")) sem_condition_grid(current_spec) else condition_grid(current_spec)
+      append_run_log(
+        "queued",
+        paste0(
+          "Prepared ", nrow(grid),
+          " condition", if (nrow(grid) == 1L) "" else "s",
+          " x ", current_spec$reps, " replications on ", active_workers(), " worker",
+          if (active_workers() == 1L) "." else "s."
+        )
       )
-    )
-    withProgress(message = "Running simulation", value = 0, {
-      append_run_log("running", paste("Checkpoint directory:", input$checkpoint_dir))
-      out <- run_simulation_study(
-        spec(),
-        workers = active_workers(),
-        checkpoint_dir = input$checkpoint_dir,
-        resume = TRUE
-      )
-      incProgress(0.8)
-      study(out)
-      manifest(out$run_manifest)
-      append_run_log("completed", paste("Finished", nrow(out$summary), "summary rows."))
-      incProgress(0.2)
-    })
+      withProgress(message = "Running simulation", value = 0, {
+        append_run_log("running", paste("Checkpoint directory:", input$checkpoint_dir))
+        out <- run_simulation_study(
+          current_spec,
+          workers = active_workers(),
+          checkpoint_dir = input$checkpoint_dir,
+          resume = TRUE
+        )
+        incProgress(0.8)
+        study(out)
+        manifest(out$run_manifest)
+        append_run_log("completed", paste("Finished", nrow(out$summary), "summary rows."))
+        incProgress(0.2)
+      })
+    }, error = function(e) notify_operation_error("run failed", e))
   })
 
   observeEvent(input$refresh_manifest, {
-    manifest(read_run_manifest(input$checkpoint_dir))
-    append_run_log("manifest", paste("Refreshed manifest from:", input$checkpoint_dir))
+    tryCatch({
+      manifest(read_run_manifest(input$checkpoint_dir))
+      append_run_log("manifest", paste("Refreshed manifest from:", input$checkpoint_dir))
+    }, error = function(e) notify_operation_error("manifest failed", e))
   })
 
   observeEvent(input$retry_failed, {
-    append_run_log("retry", "Retrying failed conditions from manifest.")
-    out <- retry_failed_conditions(
-      spec(),
-      checkpoint_dir = input$checkpoint_dir,
-      workers = active_workers()
-    )
-    manifest(read_run_manifest(input$checkpoint_dir))
-    append_run_log("retry", paste("Retry produced", nrow(out), "raw result rows."))
+    tryCatch({
+      append_run_log("retry", "Retrying failed conditions from manifest.")
+      out <- retry_failed_conditions(
+        spec(),
+        checkpoint_dir = input$checkpoint_dir,
+        workers = active_workers()
+      )
+      manifest(read_run_manifest(input$checkpoint_dir))
+      append_run_log("retry", paste("Retry produced", nrow(out), "raw result rows."))
+    }, error = function(e) notify_operation_error("retry failed", e))
   })
 
   observeEvent(input$export_quarto, {
-    path <- export_quarto_project(
-      spec(),
-      path = input$export_path,
-      overwrite = TRUE,
-      workers = active_workers(),
-      checkpoint_dir = "results/checkpoints"
-    )
-    exported_path(path)
-    updateSelectInput(session, "export_file", choices = exported_files(path))
-    export_status(paste("Exported reproducible Quarto project to:", path))
-    append_run_log("exported", paste("Quarto project:", path))
+    tryCatch({
+      path <- export_quarto_project(
+        spec(),
+        path = input$export_path,
+        overwrite = TRUE,
+        workers = active_workers(),
+        checkpoint_dir = "results/checkpoints"
+      )
+      exported_path(path)
+      updateSelectInput(session, "export_file", choices = exported_files(path))
+      export_status(paste("Exported reproducible Quarto project to:", path))
+      append_run_log("exported", paste("Quarto project:", path))
+    }, error = function(e) {
+      export_status(paste("Export failed:", conditionMessage(e)))
+      notify_operation_error("export failed", e)
+    })
   })
 
   output$run_log <- renderTable({
@@ -1465,7 +1484,7 @@ server <- function(input, output, session) {
     readiness_counts <- table(current_readiness()$level, useNA = "ifany")
     decision <- current_readiness_decision()
     tagList(
-      tags$p(tags$strong("Decision"), tags$br(), decision$decision[[1]]),
+      tags$p(tags$strong("Decision"), tags$br(), decision$decision_label[[1]]),
       tags$p(tags$strong("Diagnostics"), tags$br(), paste(paste(names(severity_counts), as.integer(severity_counts), sep = ": "), collapse = "; ")),
       tags$p(tags$strong("Checklist"), tags$br(), paste(paste(names(checklist_counts), as.integer(checklist_counts), sep = ": "), collapse = "; ")),
       tags$p(tags$strong("Readiness"), tags$br(), paste(paste(names(readiness_counts), as.integer(readiness_counts), sep = ": "), collapse = "; ")),

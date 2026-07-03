@@ -271,6 +271,11 @@ publication_summary_text <- function(spec, diagnostics, checklist = NULL, recomm
   if (is.null(recommendations)) {
     recommendations <- publication_recommendations(diagnostics, checklist)
   }
+  decision <- readiness_decision(
+    simulation_readiness(spec),
+    diagnostics = diagnostics,
+    checklist = checklist
+  )
 
   severity_counts <- if (!is.null(diagnostics) && nrow(diagnostics)) {
     counts <- table(diagnostics$severity, useNA = "ifany")
@@ -297,6 +302,10 @@ publication_summary_text <- function(spec, diagnostics, checklist = NULL, recomm
     paste0("Design rationale: ", spec$design_rationale),
     paste0("Metric rationale: ", spec$metric_rationale),
     paste0("Interpretation plan: ", spec$interpretation_plan),
+    paste0(
+      "Readiness decision: ", decision$decision_label[[1L]], ". ",
+      decision$message[[1L]], " Next step: ", decision$next_step[[1L]]
+    ),
     paste0("Automated publication diagnostics were summarized as: ", severity_counts, "."),
     paste0("Recommended next steps: ", top_recommendations),
     sep = "\n\n"

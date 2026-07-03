@@ -24,8 +24,9 @@ test_that("publication helpers create reviewer-facing artifacts", {
   expect_true(any(checklist$status == "review"))
   expect_true(all(c("mode", "level", "check", "message", "action") %in% names(readiness)))
   expect_true(any(readiness$level == "warning"))
-  expect_true(all(c("decision", "level", "issues", "message", "next_step") %in% names(decision)))
+  expect_true(all(c("decision", "decision_label", "level", "issues", "message", "next_step") %in% names(decision)))
   expect_equal(decision$decision, "revise_before_claims")
+  expect_equal(decision$decision_label, "Revise before making claims")
   expect_equal(manifest$study_type, "ols")
   expect_true(nzchar(manifest$spec_checksum))
   expect_equal(manifest$raw_results_rows, nrow(results))
@@ -33,6 +34,7 @@ test_that("publication helpers create reviewer-facing artifacts", {
   expect_true(any(diagnostics$check == "replications"))
   expect_true(all(c("priority", "area", "recommendation", "rationale") %in% names(recommendations)))
   expect_true(grepl("Recommended next steps", summary_text, fixed = TRUE))
+  expect_true(grepl("Readiness decision", summary_text, fixed = TRUE))
   expect_true(grepl("Design rationale", summary_text, fixed = TRUE))
   expect_true(any(checklist$item == "State the interpretation plan before reviewing results."))
 
