@@ -2,18 +2,17 @@ library(shiny)
 library(bslib)
 library(mcsimr)
 
-parse_numeric <- function(x) {
-  as.numeric(trimws(strsplit(x, ",", fixed = TRUE)[[1L]]))
-}
-
-parse_character <- function(x) {
-  vals <- trimws(unlist(strsplit(as.character(x), ",", fixed = TRUE)))
-  vals[nzchar(vals)]
-}
-
 split_csv <- function(x) {
   vals <- trimws(unlist(strsplit(as.character(x), ",", fixed = TRUE)))
   vals[nzchar(vals)]
+}
+
+parse_numeric <- function(x) {
+  suppressWarnings(as.numeric(split_csv(x)))
+}
+
+parse_character <- function(x) {
+  split_csv(x)
 }
 
 parse_optional_character <- function(x) {
@@ -30,6 +29,62 @@ r_character_vector_or_null <- function(x) {
     return("NULL")
   }
   paste0("c(", paste(sprintf('"%s"', x), collapse = ", "), ")")
+}
+
+numeric_input_issue <- function(label, value, required = TRUE, min = NULL, max = NULL,
+                                lower_open = FALSE, upper_open = FALSE) {
+  tokens <- split_csv(value)
+  if (!length(tokens)) {
+    if (required) {
+      return(data.frame(level = "error", field = label, message = "Enter at least one numeric value.", stringsAsFactors = FALSE))
+    }
+    return(NULL)
+  }
+  numbers <- suppressWarnings(as.numeric(tokens))
+  if (any(is.na(numbers))) {
+    bad <- tokens[is.na(numbers)]
+    return(data.frame(
+      level = "error",
+      field = label,
+      message = paste("Could not read numeric value(s):", paste(bad, collapse = ", ")),
+      stringsAsFactors = FALSE
+    ))
+  }
+  if (!is.null(min)) {
+    too_low <- if (lower_open) numbers <= min else numbers < min
+    if (any(too_low)) {
+      relation <- if (lower_open) "greater than" else "at least"
+      return(data.frame(
+        level = "error",
+        field = label,
+        message = paste("Values must be", relation, min, "."),
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
+  if (!is.null(max)) {
+    too_high <- if (upper_open) numbers >= max else numbers > max
+    if (any(too_high)) {
+      relation <- if (upper_open) "less than" else "at most"
+      return(data.frame(
+        level = "error",
+        field = label,
+        message = paste("Values must be", relation, max, "."),
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
+  NULL
+}
+
+combine_issue_rows <- function(rows) {
+  rows <- Filter(Negate(is.null), rows)
+  if (!length(rows)) {
+    return(data.frame(level = "ok", field = "Inputs", message = "No blocking input issues detected.", stringsAsFactors = FALSE))
+  }
+  out <- do.call(rbind, rows)
+  rownames(out) <- NULL
+  out
 }
 
 parse_named_lines <- function(x) {
@@ -645,6 +700,14 @@ ui <- page_sidebar(
           uiOutput("design_warnings")
         ),
         card(
+          card_header("Input audit"),
+          tableOutput("input_audit")
+        ),
+        card(
+          card_header("Design size"),
+          tableOutput("design_size")
+        ),
+        card(
           card_header("Validation"),
           tableOutput("design_validation")
         ),
@@ -776,8 +839,10 @@ ui <- page_sidebar(
         card(
           card_header("Download publication artifacts"),
           layout_columns(
-            col_widths = c(4, 4, 4, 6, 6),
+            col_widths = c(4, 4, 4, 4, 4, 4, 6),
             downloadButton("download_diagnostics", "Download diagnostics"),
+            downloadButton("download_readiness", "Download readiness"),
+            downloadButton("download_readiness_decision", "Download decision"),
             downloadButton("download_checklist", "Download checklist"),
             downloadButton("download_recommendations", "Download recommendations"),
             downloadButton("download_summary_text", "Download summary"),
@@ -861,6 +926,58 @@ server <- function(input, output, session) {
     )
   })
 
+  input_issues <- reactive({
+    rows <- list(
+      numeric_input_issue("Sample sizes", input$n, min = 1, lower_open = TRUE),
+      numeric_input_issue("Replications per condition", input$reps, min = 1),
+      numeric_input_issue("Alpha", input$alpha, min = 0, max = 1, lower_open = TRUE, upper_open = TRUE),
+      numeric_input_issue("Seed", input$seed, min = 1),
+      numeric_input_issue("Workers", active_workers(), min = 1)
+    )
+
+    if (identical(input$simulation_type, "sem")) {
+      rows <- c(rows, list(
+        numeric_input_issue("Missing-data rates", input$missing_rate, min = 0, max = 1, upper_open = TRUE),
+        numeric_input_issue("Missingness slope", input$missing_slope, required = TRUE),
+        numeric_input_issue("Observed-variable skewness", input$skewness, required = TRUE),
+        numeric_input_issue("Observed-variable excess kurtosis", input$kurtosis, required = TRUE),
+        numeric_input_issue("Group proportions", input$group_proportions, required = FALSE, min = 0, lower_open = TRUE)
+      ))
+      parsed_conditions <- tryCatch(parameter_conditions(), error = identity)
+      if (inherits(parsed_conditions, "error")) {
+        rows <- c(rows, list(data.frame(
+          level = "error",
+          field = "Parameter conditions",
+          message = conditionMessage(parsed_conditions),
+          stringsAsFactors = FALSE
+        )))
+      }
+      missing_rates <- parse_numeric(input$missing_rate)
+      if ("mar" %in% parse_character(input$missing_mechanism) &&
+          any(!is.na(missing_rates) & missing_rates > 0) &&
+          is.null(parse_optional_character(input$missing_driver))) {
+        rows <- c(rows, list(data.frame(
+          level = "review",
+          field = "MAR driver",
+          message = "MAR missingness is selected without a driver variable.",
+          stringsAsFactors = FALSE
+        )))
+      }
+    } else {
+      rows <- c(rows, list(
+        numeric_input_issue("True betas", input$betas, required = TRUE),
+        numeric_input_issue("Predictor correlations", input$condition_rho, min = -1, max = 1, lower_open = TRUE, upper_open = TRUE),
+        numeric_input_issue("Residual SD conditions", input$condition_error_sd, min = 0, lower_open = TRUE)
+      ))
+    }
+    combine_issue_rows(rows)
+  })
+
+  blocking_input_issues <- reactive({
+    issues <- input_issues()
+    issues[issues$level == "error", , drop = FALSE]
+  })
+
   load_sem_preset <- function(name) {
     preset <- sem_model_preset(name)
     updateTextAreaInput(session, "population_model", value = preset$population_model)
@@ -907,6 +1024,11 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$add_condition, {
+    issue <- numeric_input_issue("Condition values", input$condition_values, required = TRUE)
+    if (!is.null(issue)) {
+      showNotification(paste(issue$field[[1L]], issue$message[[1L]], sep = ": "), type = "error")
+      return(invisible(FALSE))
+    }
     vals <- parse_numeric(input$condition_values)
     line <- format_parameter_condition_line(input$condition_lhs, input$condition_op, input$condition_rhs, vals)
     current <- trimws(input$parameter_conditions)
@@ -994,6 +1116,11 @@ server <- function(input, output, session) {
       updateTextInput(session, "condition_values", value = values)
     }
     if (isTRUE(add)) {
+      issue <- numeric_input_issue("Selected-parameter condition values", values, required = TRUE)
+      if (!is.null(issue)) {
+        showNotification(paste(issue$field[[1L]], issue$message[[1L]], sep = ": "), type = "error")
+        return(invisible(FALSE))
+      }
       vals <- parse_numeric(values)
       line <- format_parameter_condition_line(parts[[1L]], parts[[2L]], parts[[3L]], vals)
       current <- trimws(input$parameter_conditions)
@@ -1029,6 +1156,8 @@ server <- function(input, output, session) {
   })
 
   spec <- reactive({
+    issues <- blocking_input_issues()
+    validate(need(!nrow(issues), paste(issues$field[[1L]], issues$message[[1L]], sep = ": ")))
     if (identical(input$simulation_type, "sem")) {
     sem_sim_spec(
         population_model = input$population_model,
@@ -1091,12 +1220,27 @@ server <- function(input, output, session) {
   }, striped = TRUE, bordered = TRUE)
 
   output$design_summary <- renderTable({
-    req(identical(input$simulation_type, "sem"))
-    sem_design_summary(spec())
+    current_spec <- spec()
+    if (identical(current_spec$type, "sem")) {
+      sem_design_summary(current_spec)
+    } else {
+      data.frame(
+        item = c("Model family", "Sample sizes", "Condition factors", "Replications"),
+        value = c(
+          "OLS regression",
+          paste(current_spec$n, collapse = ", "),
+          "sample size, predictor correlation, residual SD",
+          current_spec$reps
+        ),
+        stringsAsFactors = FALSE
+      )
+    }
   }, striped = TRUE, bordered = TRUE)
 
   output$design_warnings <- renderUI({
-    req(identical(input$simulation_type, "sem"))
+    if (!identical(input$simulation_type, "sem")) {
+      return(NULL)
+    }
     notes <- sem_design_warnings(spec())
     tagList(lapply(seq_len(nrow(notes)), function(i) {
       tags$div(
@@ -1107,8 +1251,26 @@ server <- function(input, output, session) {
   })
 
   output$design_validation <- renderTable({
-    req(identical(input$simulation_type, "sem"))
     validate_simulation_design(spec())
+  }, striped = TRUE, bordered = TRUE)
+
+  output$input_audit <- renderTable({
+    input_issues()
+  }, striped = TRUE, bordered = TRUE)
+
+  output$design_size <- renderTable({
+    current_spec <- spec()
+    grid <- if (identical(current_spec$type, "sem")) {
+      sem_condition_grid(current_spec)
+    } else {
+      condition_grid(current_spec)
+    }
+    total_fits <- nrow(grid) * current_spec$reps
+    data.frame(
+      item = c("Conditions", "Replications per condition", "Total model fits", "Workers", "Readiness mode"),
+      value = c(nrow(grid), current_spec$reps, total_fits, active_workers(), current_spec$readiness_mode),
+      stringsAsFactors = FALSE
+    )
   }, striped = TRUE, bordered = TRUE)
 
   output$readiness_review <- renderTable({
@@ -1120,8 +1282,12 @@ server <- function(input, output, session) {
   }, striped = TRUE, bordered = TRUE)
 
   output$condition_grid_full <- renderTable({
-    req(identical(input$simulation_type, "sem"))
-    sem_condition_grid(spec())
+    current_spec <- spec()
+    if (identical(current_spec$type, "sem")) {
+      sem_condition_grid(current_spec)
+    } else {
+      condition_grid(current_spec)
+    }
   }, striped = TRUE, bordered = TRUE)
 
   observeEvent(input$run, {
@@ -1568,6 +1734,20 @@ server <- function(input, output, session) {
     filename = function() "mcsimr-diagnostics.csv",
     content = function(file) {
       utils::write.csv(current_diagnostics(), file, row.names = FALSE)
+    }
+  )
+
+  output$download_readiness <- downloadHandler(
+    filename = function() "mcsimr-readiness.csv",
+    content = function(file) {
+      utils::write.csv(current_readiness(), file, row.names = FALSE)
+    }
+  )
+
+  output$download_readiness_decision <- downloadHandler(
+    filename = function() "mcsimr-readiness-decision.csv",
+    content = function(file) {
+      utils::write.csv(current_readiness_decision(), file, row.names = FALSE)
     }
   )
 
