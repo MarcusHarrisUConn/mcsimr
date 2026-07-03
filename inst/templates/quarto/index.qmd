@@ -104,6 +104,14 @@ if (exists("readiness") && nrow(readiness)) {
 }
 ```
 
+## Readiness Decision
+
+```{r}
+if (exists("readiness_decision") && nrow(readiness_decision)) {
+  readiness_decision
+}
+```
+
 ## Recommended Next Steps
 
 ```{r}

@@ -64,9 +64,16 @@ run_step("Source build", {
 })
 
 tarball <- list.files(pattern = "^mcsimr_[0-9].*[.]tar[.]gz$")
-tarball <- tarball[order(file.info(tarball)$mtime, decreasing = TRUE)][[1L]]
+if (!length(tarball)) {
+  tarball <- NA_character_
+} else {
+  tarball <- tarball[order(file.info(tarball)$mtime, decreasing = TRUE)][[1L]]
+}
 
 run_step("CRAN-style check", {
+  if (is.na(tarball) || !file.exists(tarball)) {
+    stop("No source tarball was available for R CMD check.", call. = FALSE)
+  }
   run_command("R", c("CMD", "check", "--as-cran", "--no-manual", tarball), env = path_env)
 })
 

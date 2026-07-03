@@ -3,10 +3,12 @@
 ^[.]github$
 ^_pkgdown[.]yml$
 ^cran-comments[.]md$
+^CRAN_SUBMISSION[.]md$
 ^docs$
 ^examples$
 ^dev$
 ^LICENSE[.]md$
+^RELEASE[.]md$
 ^scripts$
 ^.*[.]Rcheck$
 ^app$

@@ -102,6 +102,62 @@ simulation_readiness <- function(spec, mode = NULL) {
   out
 }
 
+readiness_decision <- function(readiness, diagnostics = NULL, checklist = NULL) {
+  if (is.null(readiness) || !nrow(readiness)) {
+    return(data.frame(
+      decision = "run_review",
+      level = "error",
+      issues = 1L,
+      message = "No readiness review was available.",
+      next_step = "Create a simulation specification and run simulation_readiness() before interpreting results.",
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  readiness_levels <- tolower(as.character(readiness$level))
+  diagnostic_levels <- if (!is.null(diagnostics) && nrow(diagnostics)) {
+    tolower(as.character(diagnostics$severity))
+  } else {
+    character()
+  }
+  checklist_levels <- if (!is.null(checklist) && nrow(checklist)) {
+    tolower(as.character(checklist$status))
+  } else {
+    character()
+  }
+
+  issue_levels <- c(readiness_levels, diagnostic_levels, checklist_levels)
+  high_issues <- sum(issue_levels %in% c("error", "warning"), na.rm = TRUE)
+  review_issues <- sum(issue_levels %in% c("review", "missing", "info"), na.rm = TRUE)
+  total_issues <- high_issues + review_issues
+
+  if (high_issues > 0L) {
+    decision <- "revise_before_claims"
+    level <- "warning"
+    message <- paste(high_issues, "high-priority readiness or diagnostic issue(s) should be addressed before publication claims.")
+    next_step <- "Revise the design or document a defensible rationale, then rerun the affected simulation conditions."
+  } else if (review_issues > 0L) {
+    decision <- "pilot_or_document"
+    level <- "review"
+    message <- paste(review_issues, "review item(s) remain before treating this as a final study.")
+    next_step <- "Use the run as a pilot or complete the rationale, reporting checklist, and interpretation notes."
+  } else {
+    decision <- "ready_for_publication_review"
+    level <- "ok"
+    message <- "Automated readiness, diagnostics, and checklist items did not flag unresolved issues."
+    next_step <- "Proceed to manuscript review, sensitivity checks, and substantive interpretation."
+  }
+
+  data.frame(
+    decision = decision,
+    level = level,
+    issues = total_issues,
+    message = message,
+    next_step = next_step,
+    stringsAsFactors = FALSE
+  )
+}
+
 validate_ols_design <- function(spec) {
   validate_ols_spec(spec)
   rows <- list()

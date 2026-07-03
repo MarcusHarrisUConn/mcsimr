@@ -18,6 +18,7 @@
 \alias{publication_recommendations}
 \alias{publication_summary_text}
 \alias{read_run_manifest}
+\alias{readiness_decision}
 \alias{reproducibility_manifest}
 \alias{run_manifest_path}
 \alias{apply_sem_misspecification}
@@ -193,6 +194,8 @@ simulation_diagnostics(results, summary, spec = NULL)
 
 simulation_readiness(spec, mode = NULL)
 
+readiness_decision(readiness, diagnostics = NULL, checklist = NULL)
+
 plot_metric(summary, metric = "bias", term = NULL, path = NULL,
   width = 900, height = 650)
 
@@ -272,6 +275,7 @@ use_mcsimr_app(...)
 \item{manifest}{Reproducibility manifest list or run manifest data frame.}
 \item{diagnostics}{Diagnostics data frame created by \code{simulation_diagnostics()}.}
 \item{checklist}{Optional checklist data frame created by \code{publication_checklist()}.}
+\item{readiness}{Readiness review data frame created by \code{simulation_readiness()}.}
 \item{recommendations}{Optional recommendations data frame created by \code{publication_recommendations()}.}
 \item{text}{Publication summary text.}
 \item{mode}{Optional readiness mode, either \code{"teaching"} or \code{"publication"}.}

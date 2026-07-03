@@ -653,6 +653,10 @@ ui <- page_sidebar(
           tableOutput("readiness_review")
         ),
         card(
+          card_header("Readiness decision"),
+          tableOutput("pre_run_readiness_decision")
+        ),
+        card(
           card_header("Model parameters to vary"),
           tags$div(class = "parameter-picker", uiOutput("candidate_parameter_ui")),
           layout_columns(
@@ -744,6 +748,10 @@ ui <- page_sidebar(
         card(
           card_header("Readiness review"),
           tableOutput("publication_readiness")
+        ),
+        card(
+          card_header("Readiness decision"),
+          tableOutput("publication_readiness_decision")
         ),
         card(
           card_header("Diagnostic plot"),
@@ -1107,6 +1115,10 @@ server <- function(input, output, session) {
     simulation_readiness(spec(), mode = input$readiness_mode)
   }, striped = TRUE, bordered = TRUE)
 
+  output$pre_run_readiness_decision <- renderTable({
+    readiness_decision(simulation_readiness(spec(), mode = input$readiness_mode))
+  }, striped = TRUE, bordered = TRUE)
+
   output$condition_grid_full <- renderTable({
     req(identical(input$simulation_type, "sem"))
     sem_condition_grid(spec())
@@ -1257,6 +1269,11 @@ server <- function(input, output, session) {
     study()$readiness
   })
 
+  current_readiness_decision <- reactive({
+    req(study())
+    study()$readiness_decision
+  })
+
   current_recommendations <- reactive({
     req(study())
     study()$publication_recommendations
@@ -1280,7 +1297,9 @@ server <- function(input, output, session) {
     checklist_counts <- table(checklist$status, useNA = "ifany")
     high_priority <- sum(current_recommendations()$priority == "high", na.rm = TRUE)
     readiness_counts <- table(current_readiness()$level, useNA = "ifany")
+    decision <- current_readiness_decision()
     tagList(
+      tags$p(tags$strong("Decision"), tags$br(), decision$decision[[1]]),
       tags$p(tags$strong("Diagnostics"), tags$br(), paste(paste(names(severity_counts), as.integer(severity_counts), sep = ": "), collapse = "; ")),
       tags$p(tags$strong("Checklist"), tags$br(), paste(paste(names(checklist_counts), as.integer(checklist_counts), sep = ": "), collapse = "; ")),
       tags$p(tags$strong("Readiness"), tags$br(), paste(paste(names(readiness_counts), as.integer(readiness_counts), sep = ": "), collapse = "; ")),
@@ -1296,6 +1315,10 @@ server <- function(input, output, session) {
 
   output$publication_readiness <- renderTable({
     current_readiness()
+  }, striped = TRUE, bordered = TRUE)
+
+  output$publication_readiness_decision <- renderTable({
+    current_readiness_decision()
   }, striped = TRUE, bordered = TRUE)
 
   output$diagnostics_plot <- renderPlot({
@@ -1424,6 +1447,7 @@ server <- function(input, output, session) {
           "runtime_estimate <- study$runtime_estimate",
           "diagnostics <- study$diagnostics",
           "readiness <- study$readiness",
+          "readiness_decision <- study$readiness_decision",
           "reporting_checklist <- study$reporting_checklist",
           "reproducibility <- study$reproducibility",
           "publication_recommendations <- study$publication_recommendations",
@@ -1501,6 +1525,7 @@ server <- function(input, output, session) {
         "runtime_estimate <- study$runtime_estimate",
         "diagnostics <- study$diagnostics",
         "readiness <- study$readiness",
+        "readiness_decision <- study$readiness_decision",
         "reporting_checklist <- study$reporting_checklist",
         "reproducibility <- study$reproducibility",
         "publication_recommendations <- study$publication_recommendations",

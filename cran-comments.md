@@ -1,6 +1,6 @@
 ## R CMD check results
 
-Local checks were run on macOS Tahoe 26.5.1, R 4.6.1:
+Local checks were run on macOS Tahoe 26.5.2, R 4.6.1:
 
 ```r
 R CMD build .
@@ -24,6 +24,7 @@ New submission
 
 Additional release checks:
 
+- `Rscript dev/check-publication-readiness.R`: local release gate for app syntax, tests, source build, CRAN-style checks, spelling, and URLs.
 - `urlchecker::url_check()`: all URLs are correct.
 - `spelling::spell_check_package()`: no spelling errors found.
 
@@ -33,7 +34,7 @@ initializing. The package reports this condition explicitly during SEM runs.
 
 ## Test environments
 
-- local macOS Tahoe 26.5.1, R 4.6.1
+- local macOS Tahoe 26.5.2, R 4.6.1
 - GitHub Actions R-CMD-check on ubuntu-latest
 
 ## Downstream dependencies

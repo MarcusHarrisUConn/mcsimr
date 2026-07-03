@@ -222,6 +222,7 @@ run_simulation_study <- function(spec,
   diagnostics <- simulation_diagnostics(raw, summary, spec = spec)
   reporting_checklist <- publication_checklist(spec)
   readiness <- simulation_readiness(spec)
+  readiness_summary <- readiness_decision(readiness, diagnostics, reporting_checklist)
   reproducibility <- reproducibility_manifest(spec, raw_results = raw, summary = summary)
   publication_recommendations_tbl <- publication_recommendations(diagnostics, reporting_checklist)
   publication_summary <- publication_summary_text(
@@ -243,6 +244,7 @@ run_simulation_study <- function(spec,
     diagnostics = diagnostics,
     reporting_checklist = reporting_checklist,
     readiness = readiness,
+    readiness_decision = readiness_summary,
     reproducibility = reproducibility,
     publication_recommendations = publication_recommendations_tbl,
     publication_summary = publication_summary,
@@ -269,6 +271,7 @@ run_simulation_study <- function(spec,
     utils::write.csv(diagnostics, file.path(output_dir, "diagnostics.csv"), row.names = FALSE)
     utils::write.csv(reporting_checklist, file.path(output_dir, "reporting-checklist.csv"), row.names = FALSE)
     utils::write.csv(readiness, file.path(output_dir, "readiness.csv"), row.names = FALSE)
+    utils::write.csv(readiness_summary, file.path(output_dir, "readiness-decision.csv"), row.names = FALSE)
     utils::write.csv(publication_recommendations_tbl, file.path(output_dir, "publication-recommendations.csv"), row.names = FALSE)
     write_reproducibility_manifest(reproducibility, file.path(output_dir, "reproducibility.yml"))
     write_publication_summary(publication_summary, file.path(output_dir, "publication-summary.md"))

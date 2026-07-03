@@ -130,6 +130,9 @@ work. In addition to raw simulation results, each `run_simulation_study()`
 bundle includes:
 
 - `readiness`: mode-aware teaching/publication checks before interpreting a run;
+- `readiness_decision`: a one-row decision summary that labels the study as
+  needing revision, usable as a documented pilot, or ready for publication
+  review;
 - `diagnostics`: convergence, failure, coverage, Monte Carlo error, replication,
   and inadmissible-solution checks that identify fragile design cells;
 - `reporting_checklist`: reviewer-facing items students should address before
@@ -141,7 +144,8 @@ bundle includes:
   session information, and a checksum of the simulation specification.
 
 When an output directory is supplied, these are written as
-`diagnostics.csv`, `reporting-checklist.csv`, and `reproducibility.yml`.
+`diagnostics.csv`, `reporting-checklist.csv`, `readiness.csv`,
+`readiness-decision.csv`, and `reproducibility.yml`.
 Publication figures are also written to `publication-figures/`, including
 line plots, heatmaps, and a diagnostic severity plot.
 The Quarto export also includes them in the generated report so a project can
