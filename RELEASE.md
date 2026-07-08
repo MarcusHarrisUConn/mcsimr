@@ -7,6 +7,7 @@ Use this checklist before tagging a CRAN or public release.
 - Confirm `DESCRIPTION`, `NEWS.md`, `README.md`, and `cran-comments.md` describe the same release.
 - Confirm the Shiny app starts locally with `use_mcsimr_app(host = "127.0.0.1")`.
 - Confirm the Shinylive demo still mirrors the installed app for teaching and export workflows.
+- Confirm one-worker and multi-worker runs give identical results for the same seed and design.
 - Review exported Quarto projects for `readiness.csv`, `readiness-decision.csv`, `truth-map.csv`, `missingness-diagnostics.csv`, diagnostics, reporting checklist, reproducibility metadata, methods text, tables, and figures.
 
 ## Local Checks

@@ -1,5 +1,6 @@
 run_replication <- function(spec, n, rep_id, condition_id = 1L) {
   validate_ols_spec(spec)
+  set_replication_seed(spec$seed, condition_id, rep_id)
   if (is.null(spec$current_predictor_correlation)) {
     spec$current_predictor_correlation <- spec$predictor_correlation[1L]
   }
@@ -61,13 +62,12 @@ run_condition <- function(spec, condition, workers = 1L) {
   if (workers > 1L) {
     cl <- parallel::makeCluster(workers)
     on.exit(parallel::stopCluster(cl), add = TRUE)
-    parallel::clusterSetRNGStream(cl, spec$seed + condition$condition_id)
     parallel::clusterExport(
       cl,
       varlist = c(
         "spec", "condition", "run_replication", "generate_ols_data",
         "fit_ols_model", "extract_ols_estimates", "make_predictor_cov",
-        "validate_ols_spec"
+        "validate_ols_spec", "replication_seed", "set_replication_seed"
       ),
       envir = environment()
     )
@@ -77,7 +77,6 @@ run_condition <- function(spec, condition, workers = 1L) {
       function(rep_id) run_replication(spec, condition$n, rep_id, condition$condition_id)
     )
   } else {
-    set.seed(spec$seed + condition$condition_id)
     pieces <- lapply(
       reps,
       function(rep_id) run_replication(spec, condition$n, rep_id, condition$condition_id)
@@ -85,6 +84,24 @@ run_condition <- function(spec, condition, workers = 1L) {
   }
 
   do.call(rbind, pieces)
+}
+
+replication_seed <- function(seed, condition_id, rep_id) {
+  base <- as.integer(seed)[1L]
+  condition_id <- as.integer(condition_id)[1L]
+  rep_id <- as.integer(rep_id)[1L]
+  as.integer((base + condition_id * 1000003L + rep_id * 9176L) %% .Machine$integer.max)
+}
+
+set_replication_seed <- function(seed, condition_id, rep_id) {
+  value <- replication_seed(seed, condition_id, rep_id)
+  set.seed(
+    value,
+    kind = "Mersenne-Twister",
+    normal.kind = "Inversion",
+    sample.kind = "Rejection"
+  )
+  invisible(value)
 }
 
 run_ols_simulation <- function(spec,

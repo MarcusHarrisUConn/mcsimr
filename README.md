@@ -147,6 +147,10 @@ bundle includes:
 - `reproducibility`: seed, R version, platform, package versions, row counts,
   session information, and a checksum of the simulation specification.
 
+Replications are seeded from the base seed, condition ID, and replication ID, so
+changing worker counts or running deterministic condition shards does not change
+the random draws for a given design cell.
+
 When an output directory is supplied, these are written as
 `diagnostics.csv`, `truth-map.csv`, `missingness-diagnostics.csv`,
 `reporting-checklist.csv`, `readiness.csv`, `readiness-decision.csv`, and
@@ -296,6 +300,11 @@ engine and can write checkpoints to disk. It now uses a tabbed workflow:
 For simulations that may run for days or weeks, use checkpoint directories and
 rerun with `resume = TRUE`. Each checkpoint directory now includes
 `run-manifest.csv`, which can be read with `read_run_manifest()`:
+
+Because each replication has a deterministic seed, a pilot run with one worker,
+a later local run with multiple workers, and condition shards submitted to a
+cluster all target the same replication-level random draws for the same
+condition IDs.
 
 ```r
 read_run_manifest("results/checkpoints/sem-demo")

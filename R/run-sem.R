@@ -13,6 +13,7 @@ lavaan_runtime_error <- function() {
 
 run_sem_replication <- function(spec, condition, rep_id) {
   validate_sem_spec(spec)
+  set_replication_seed(spec$seed, condition$condition_id, rep_id)
   if (!lavaan_runtime_available()) {
     return(sem_error_row(spec, condition, rep_id, lavaan_runtime_error()))
   }
@@ -145,7 +146,6 @@ run_sem_condition <- function(spec, condition, workers = 1L) {
   if (workers > 1L) {
     cl <- parallel::makeCluster(workers)
     on.exit(parallel::stopCluster(cl), add = TRUE)
-    parallel::clusterSetRNGStream(cl, spec$seed + condition$condition_id)
     parallel::clusterEvalQ(cl, library(lavaan))
     parallel::clusterExport(
       cl,
@@ -158,7 +158,8 @@ run_sem_condition <- function(spec, condition, workers = 1L) {
         "apply_mcar_missing", "apply_sem_missing", "resolve_missing_targets",
         "missing_probabilities", "standardize_for_missing", "sem_moment_arg",
         "simulate_sem_data", "sem_group_sample_sizes",
-        "sem_missingness_summary", "lavaan_runtime_available", "lavaan_runtime_error"
+        "sem_missingness_summary", "replication_seed", "set_replication_seed",
+        "lavaan_runtime_available", "lavaan_runtime_error"
       ),
       envir = environment()
     )
@@ -168,7 +169,6 @@ run_sem_condition <- function(spec, condition, workers = 1L) {
       function(rep_id) run_sem_replication(spec, condition, rep_id)
     )
   } else {
-    set.seed(spec$seed + condition$condition_id)
     pieces <- lapply(reps, function(rep_id) run_sem_replication(spec, condition, rep_id))
   }
 

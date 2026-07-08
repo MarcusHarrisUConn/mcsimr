@@ -67,3 +67,60 @@ test_that("missingness diagnostics prefer target-cell rates when available", {
   expect_equal(diagnostics$mean_observed_missing_rate, 0.11)
   expect_equal(diagnostics$mean_observed_target_missing_rate, 0.30)
 })
+
+test_that("OLS simulations are reproducible across worker counts", {
+  cl <- tryCatch(parallel::makeCluster(2), error = identity)
+  if (inherits(cl, "error")) {
+    skip("This R session cannot create a local parallel cluster.")
+  }
+  parallel::stopCluster(cl)
+
+  spec <- ols_sim_spec(
+    n = c(30, 40),
+    reps = 3,
+    betas = c(0.20, -0.10),
+    predictor_correlation = c(0, 0.20),
+    error_sd = 1.5,
+    seed = 8675309
+  )
+
+  one_worker <- run_ols_simulation(spec, workers = 1)
+  two_workers <- run_ols_simulation(spec, workers = 2)
+
+  rownames(one_worker) <- NULL
+  rownames(two_workers) <- NULL
+  expect_equal(two_workers, one_worker, tolerance = 1e-12)
+})
+
+test_that("SEM simulations are reproducible across worker counts", {
+  skip_if_not(lavaan_runtime_available(), lavaan_runtime_error())
+  cl <- tryCatch(parallel::makeCluster(2), error = identity)
+  if (inherits(cl, "error")) {
+    skip("This R session cannot create a local parallel cluster.")
+  }
+  parallel::stopCluster(cl)
+
+  model <- paste(
+    "f =~ 0.7*y1 + 0.8*y2 + 0.9*y3",
+    "f ~~ 1*f",
+    "y1 ~~ 0.51*y1",
+    "y2 ~~ 0.36*y2",
+    "y3 ~~ 0.19*y3",
+    sep = "\n"
+  )
+  spec <- sem_sim_spec(
+    model,
+    n = 60,
+    reps = 2,
+    missing_rate = 0.10,
+    missing_targets = c("y1", "y2"),
+    seed = 2468
+  )
+
+  one_worker <- run_sem_simulation(spec, workers = 1)
+  two_workers <- run_sem_simulation(spec, workers = 2)
+
+  rownames(one_worker) <- NULL
+  rownames(two_workers) <- NULL
+  expect_equal(two_workers, one_worker, tolerance = 1e-12, ignore_attr = TRUE)
+})
