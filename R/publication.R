@@ -198,6 +198,24 @@ simulation_diagnostics <- function(results, summary, spec = NULL) {
     )
   }
 
+  missingness <- missingness_diagnostics(results)
+  if (nrow(missingness)) {
+    calibration_rate <- if ("mean_observed_target_missing_rate" %in% names(missingness)) {
+      missingness$mean_observed_target_missing_rate
+    } else {
+      missingness$mean_observed_missing_rate
+    }
+    max_missing_deviation <- suppressWarnings(max(abs(
+      calibration_rate - missingness$requested_missing_rate
+    ), na.rm = TRUE))
+    add(
+      if (is.finite(max_missing_deviation) && max_missing_deviation <= 0.05) "ok" else "review",
+      "missingness calibration",
+      round(max_missing_deviation, 3),
+      "Observed missingness should be checked against the requested missing-data rate by condition."
+    )
+  }
+
   out <- do.call(rbind, rows)
   rownames(out) <- NULL
   out

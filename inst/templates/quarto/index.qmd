@@ -96,6 +96,22 @@ if (exists("diagnostics") && nrow(diagnostics)) {
 }
 ```
 
+## Truth Map
+
+```{r}
+if (exists("truth_map") && nrow(truth_map)) {
+  truth_map
+}
+```
+
+## Missingness Diagnostics
+
+```{r}
+if (exists("missingness_diagnostics") && nrow(missingness_diagnostics)) {
+  missingness_diagnostics
+}
+```
+
 ## Readiness Review
 
 ```{r}

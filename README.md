@@ -135,6 +135,10 @@ bundle includes:
   review;
 - `diagnostics`: convergence, failure, coverage, Monte Carlo error, replication,
   and inadmissible-solution checks that identify fragile design cells;
+- `truth_map`: SEM parameter-level audit showing which fitted parameters had
+  explicit population truth values for bias and coverage summaries;
+- `missingness_diagnostics`: observed missingness rates by condition for SEM
+  designs with imposed missing data;
 - `reporting_checklist`: reviewer-facing items students should address before
   treating a simulation as publishable evidence;
 - `publication_recommendations`: prioritized next steps generated from the
@@ -144,8 +148,9 @@ bundle includes:
   session information, and a checksum of the simulation specification.
 
 When an output directory is supplied, these are written as
-`diagnostics.csv`, `reporting-checklist.csv`, `readiness.csv`,
-`readiness-decision.csv`, and `reproducibility.yml`.
+`diagnostics.csv`, `truth-map.csv`, `missingness-diagnostics.csv`,
+`reporting-checklist.csv`, `readiness.csv`, `readiness-decision.csv`, and
+`reproducibility.yml`.
 Publication figures are also written to `publication-figures/`, including
 line plots, heatmaps, and a diagnostic severity plot.
 The Quarto export also includes them in the generated report so a project can

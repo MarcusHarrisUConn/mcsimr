@@ -10,6 +10,7 @@
 \alias{default_metrics}
 \alias{export_quarto_project}
 \alias{metric_catalog}
+\alias{missingness_diagnostics}
 \alias{ols_sim_spec}
 \alias{plot_metric}
 \alias{plot_diagnostics}
@@ -28,6 +29,7 @@
 \alias{sem_model_presets}
 \alias{sem_misspecification_presets}
 \alias{sem_sim_spec}
+\alias{sem_truth_map}
 \alias{run_condition}
 \alias{run_ols_simulation}
 \alias{run_replication}
@@ -115,6 +117,8 @@ apply_sem_misspecification(fitted_model, preset = "none",
 sem_model_parameters(model, operators = c("=~", "~", "~~", "~1"),
   include_fixed = TRUE)
 
+sem_truth_map(population_model, fitted_model = NULL)
+
 run_manifest_path(checkpoint_dir)
 
 read_run_manifest(checkpoint_dir)
@@ -191,6 +195,8 @@ reproducibility_manifest(spec, raw_results = NULL, summary = NULL)
 write_reproducibility_manifest(manifest, path)
 
 simulation_diagnostics(results, summary, spec = NULL)
+
+missingness_diagnostics(results)
 
 simulation_readiness(spec, mode = NULL)
 

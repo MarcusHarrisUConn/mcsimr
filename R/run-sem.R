@@ -49,6 +49,12 @@ run_sem_replication <- function(spec, condition, rep_id) {
     driver = spec$missing_driver,
     slope = spec$missing_slope
   )
+  missingness <- sem_missingness_summary(
+    dat,
+    targets = spec$missing_targets,
+    driver = spec$missing_driver,
+    mechanism = condition$missing_mechanism
+  )
 
   fit_args <- list(
     model = spec$fitted_model,
@@ -117,6 +123,12 @@ run_sem_replication <- function(spec, condition, rep_id) {
     alpha = spec$alpha,
     converged = converged,
     improper_solution = improper,
+    observed_missing_rate = missingness$observed_missing_rate,
+    missing_cells = missingness$missing_cells,
+    total_cells = missingness$total_cells,
+    missing_target_cells = missingness$missing_target_cells,
+    total_target_cells = missingness$total_target_cells,
+    observed_target_missing_rate = missingness$observed_target_missing_rate,
     cfi = fit_indices[["cfi"]],
     tli = fit_indices[["tli"]],
     rmsea = fit_indices[["rmsea"]],
@@ -146,7 +158,7 @@ run_sem_condition <- function(spec, condition, workers = 1L) {
         "apply_mcar_missing", "apply_sem_missing", "resolve_missing_targets",
         "missing_probabilities", "standardize_for_missing", "sem_moment_arg",
         "simulate_sem_data", "sem_group_sample_sizes",
-        "lavaan_runtime_available", "lavaan_runtime_error"
+        "sem_missingness_summary", "lavaan_runtime_available", "lavaan_runtime_error"
       ),
       envir = environment()
     )
@@ -312,6 +324,30 @@ sem_true_values <- function(population_model) {
   vals
 }
 
+sem_truth_map <- function(population_model, fitted_model = NULL) {
+  true_values <- sem_true_values(population_model)
+  model <- if (is.null(fitted_model)) population_model else fitted_model
+  tab <- lavaan::lavaanify(model, fixed.x = FALSE)
+  keep <- tab$op %in% c("=~", "~", "~~", "~1")
+  tab <- tab[keep, , drop = FALSE]
+  keys <- sem_param_key(tab$lhs, tab$op, tab$rhs)
+  out <- data.frame(
+    lhs = tab$lhs,
+    op = tab$op,
+    rhs = tab$rhs,
+    key = keys,
+    truth_available = keys %in% names(true_values),
+    true_value = unname(true_values[keys]),
+    stringsAsFactors = FALSE
+  )
+  out$truth_note <- ifelse(
+    out$truth_available,
+    "explicit population value found",
+    "no explicit population value found; parameter is omitted from bias/coverage summaries"
+  )
+  unique(out)
+}
+
 sem_param_key <- function(lhs, op, rhs) {
   paste(lhs, op, rhs, sep = "|")
 }
@@ -438,6 +474,75 @@ missing_probabilities <- function(z, rate, slope = 1) {
   stats::plogis(intercept + slope * z)
 }
 
+sem_missingness_summary <- function(dat, targets = NULL, driver = NULL, mechanism = "mcar") {
+  total_cells <- length(dat) * nrow(dat)
+  missing_cells <- sum(is.na(dat))
+  resolved <- tryCatch(
+    resolve_missing_targets(dat, targets = targets, driver = driver, mechanism = mechanism),
+    error = function(e) list(targets = names(dat))
+  )
+  target_names <- intersect(resolved$targets, names(dat))
+  if (length(target_names)) {
+    total_target_cells <- length(target_names) * nrow(dat)
+    missing_target_cells <- sum(is.na(dat[target_names]))
+  } else {
+    total_target_cells <- NA_integer_
+    missing_target_cells <- NA_integer_
+  }
+  data.frame(
+    missing_cells = missing_cells,
+    total_cells = total_cells,
+    observed_missing_rate = if (total_cells > 0L) missing_cells / total_cells else NA_real_,
+    missing_target_cells = missing_target_cells,
+    total_target_cells = total_target_cells,
+    observed_target_missing_rate = if (is.finite(total_target_cells) && total_target_cells > 0L) {
+      missing_target_cells / total_target_cells
+    } else {
+      NA_real_
+    },
+    stringsAsFactors = FALSE
+  )
+}
+
+missingness_diagnostics <- function(results) {
+  needed <- c("condition_id", "rep_id", "missing_rate", "missing_mechanism", "observed_missing_rate")
+  if (!all(needed %in% names(results))) {
+    return(data.frame())
+  }
+  optional <- intersect("observed_target_missing_rate", names(results))
+  rows <- unique(results[, c(needed, optional), drop = FALSE])
+  rows <- rows[!is.na(rows$observed_missing_rate), , drop = FALSE]
+  if (!nrow(rows)) {
+    return(data.frame())
+  }
+  if (!"observed_target_missing_rate" %in% names(rows)) {
+    rows$observed_target_missing_rate <- NA_real_
+  }
+  rows$calibration_missing_rate <- ifelse(
+    is.na(rows$observed_target_missing_rate),
+    rows$observed_missing_rate,
+    rows$observed_target_missing_rate
+  )
+  split_key <- interaction(rows$condition_id, rows$missing_rate, rows$missing_mechanism, drop = TRUE, sep = "|")
+  groups <- split(rows, split_key)
+  out <- lapply(groups, function(dat) {
+    data.frame(
+      condition_id = dat$condition_id[[1L]],
+      requested_missing_rate = dat$missing_rate[[1L]],
+      missing_mechanism = dat$missing_mechanism[[1L]],
+      replications = length(unique(dat$rep_id)),
+      mean_observed_missing_rate = mean(dat$observed_missing_rate, na.rm = TRUE),
+      mean_observed_target_missing_rate = mean(dat$calibration_missing_rate, na.rm = TRUE),
+      min_observed_missing_rate = min(dat$observed_missing_rate, na.rm = TRUE),
+      max_observed_missing_rate = max(dat$observed_missing_rate, na.rm = TRUE),
+      stringsAsFactors = FALSE
+    )
+  })
+  out <- do.call(rbind, out)
+  rownames(out) <- NULL
+  out[order(out$condition_id), , drop = FALSE]
+}
+
 sem_error_row <- function(spec, condition, rep_id, error, converged = FALSE) {
   data.frame(
     condition_id = condition$condition_id,
@@ -464,6 +569,12 @@ sem_error_row <- function(spec, condition, rep_id, error, converged = FALSE) {
     alpha = spec$alpha,
     converged = converged,
     improper_solution = NA,
+    observed_missing_rate = NA_real_,
+    missing_cells = NA_integer_,
+    total_cells = NA_integer_,
+    missing_target_cells = NA_integer_,
+    total_target_cells = NA_integer_,
+    observed_target_missing_rate = NA_real_,
     cfi = NA_real_,
     tli = NA_real_,
     rmsea = NA_real_,

@@ -200,6 +200,8 @@ run_simulation_study <- function(spec,
       condition_ids = condition_ids
     )
     summary <- summarize_sem_results(raw, metrics = spec$metrics)
+    truth_map <- sem_truth_map(spec$population_model, spec$fitted_model)
+    missingness <- missingness_diagnostics(raw)
   } else {
     validate_ols_spec(spec)
     raw <- run_ols_simulation(
@@ -210,6 +212,8 @@ run_simulation_study <- function(spec,
       condition_ids = condition_ids
     )
     summary <- summarize_ols_results(raw, metrics = spec$metrics)
+    truth_map <- data.frame()
+    missingness <- data.frame()
   }
   apa <- apa_metric_table(summary, metrics = spec$metrics)
 
@@ -242,6 +246,8 @@ run_simulation_study <- function(spec,
     failure_summary = failure_summary,
     runtime_estimate = runtime_estimate,
     diagnostics = diagnostics,
+    missingness_diagnostics = missingness,
+    truth_map = truth_map,
     reporting_checklist = reporting_checklist,
     readiness = readiness,
     readiness_decision = readiness_summary,
@@ -269,6 +275,12 @@ run_simulation_study <- function(spec,
       utils::write.csv(bundle$runtime_estimate, file.path(output_dir, "runtime-estimate.csv"), row.names = FALSE)
     }
     utils::write.csv(diagnostics, file.path(output_dir, "diagnostics.csv"), row.names = FALSE)
+    if (nrow(missingness)) {
+      utils::write.csv(missingness, file.path(output_dir, "missingness-diagnostics.csv"), row.names = FALSE)
+    }
+    if (nrow(truth_map)) {
+      utils::write.csv(truth_map, file.path(output_dir, "truth-map.csv"), row.names = FALSE)
+    }
     utils::write.csv(reporting_checklist, file.path(output_dir, "reporting-checklist.csv"), row.names = FALSE)
     utils::write.csv(readiness, file.path(output_dir, "readiness.csv"), row.names = FALSE)
     utils::write.csv(readiness_summary, file.path(output_dir, "readiness-decision.csv"), row.names = FALSE)

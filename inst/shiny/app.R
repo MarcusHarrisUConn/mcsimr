@@ -809,6 +809,14 @@ ui <- page_sidebar(
           tableOutput("diagnostics")
         ),
         card(
+          card_header("Truth map"),
+          tableOutput("truth_map")
+        ),
+        card(
+          card_header("Missingness diagnostics"),
+          tableOutput("missingness_diagnostics")
+        ),
+        card(
           card_header("Readiness review"),
           tableOutput("publication_readiness")
         ),
@@ -1439,6 +1447,16 @@ server <- function(input, output, session) {
     study()$diagnostics
   })
 
+  current_truth_map <- reactive({
+    req(study())
+    study()$truth_map
+  })
+
+  current_missingness <- reactive({
+    req(study())
+    study()$missingness_diagnostics
+  })
+
   current_checklist <- reactive({
     req(study())
     study()$reporting_checklist
@@ -1497,6 +1515,22 @@ server <- function(input, output, session) {
   output$diagnostics <- renderTable({
     current_diagnostics()
   }, striped = TRUE, bordered = TRUE)
+
+  output$truth_map <- renderTable({
+    out <- current_truth_map()
+    if (!nrow(out)) {
+      return(data.frame(message = "Truth map is available for SEM studies.", stringsAsFactors = FALSE))
+    }
+    out
+  }, striped = TRUE, bordered = TRUE)
+
+  output$missingness_diagnostics <- renderTable({
+    out <- current_missingness()
+    if (!nrow(out)) {
+      return(data.frame(message = "No missingness diagnostics were available for this run.", stringsAsFactors = FALSE))
+    }
+    out
+  }, striped = TRUE, bordered = TRUE, digits = 4)
 
   output$publication_readiness <- renderTable({
     current_readiness()
@@ -1631,6 +1665,8 @@ server <- function(input, output, session) {
           "failure_summary <- study$failure_summary",
           "runtime_estimate <- study$runtime_estimate",
           "diagnostics <- study$diagnostics",
+          "truth_map <- study$truth_map",
+          "missingness_diagnostics <- study$missingness_diagnostics",
           "readiness <- study$readiness",
           "readiness_decision <- study$readiness_decision",
           "reporting_checklist <- study$reporting_checklist",
@@ -1709,6 +1745,8 @@ server <- function(input, output, session) {
         "failure_summary <- study$failure_summary",
         "runtime_estimate <- study$runtime_estimate",
         "diagnostics <- study$diagnostics",
+        "truth_map <- study$truth_map",
+        "missingness_diagnostics <- study$missingness_diagnostics",
         "readiness <- study$readiness",
         "readiness_decision <- study$readiness_decision",
         "reporting_checklist <- study$reporting_checklist",

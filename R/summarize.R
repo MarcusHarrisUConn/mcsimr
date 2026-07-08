@@ -27,7 +27,7 @@ summarize_ols_results <- function(results, metrics = default_metrics("ols")) {
       term = dat$term[1L],
       true_value = true,
       reps = reps,
-      convergence_rate = mean(results$converged[results$condition_id == dat$condition_id[1L]], na.rm = TRUE),
+      convergence_rate = mean(replication_status(results, dat$condition_id[1L])$converged, na.rm = TRUE),
       mean_estimate = mean(estimate, na.rm = TRUE),
       bias = mean(estimate - true, na.rm = TRUE),
       relative_bias = if (isTRUE(all.equal(true, 0))) NA_real_ else mean((estimate - true) / true, na.rm = TRUE),
@@ -137,6 +137,7 @@ summarize_sem_results <- function(results, metrics = default_metrics("sem")) {
     coverage <- dat$conf_low <= true & dat$conf_high >= true
     reps <- length(estimate)
     condition_rows <- results[results$condition_id == dat$condition_id[1L], , drop = FALSE]
+    condition_status <- replication_status(results, dat$condition_id[1L])
 
     data.frame(
       condition_id = dat$condition_id[1L],
@@ -150,8 +151,8 @@ summarize_sem_results <- function(results, metrics = default_metrics("sem")) {
       term = dat$term[1L],
       true_value = true,
       reps = reps,
-      convergence_rate = mean(condition_rows$converged, na.rm = TRUE),
-      improper_solution_rate = mean(unique(condition_rows[c("rep_id", "improper_solution")])$improper_solution, na.rm = TRUE),
+      convergence_rate = mean(condition_status$converged, na.rm = TRUE),
+      improper_solution_rate = mean(condition_status$improper_solution, na.rm = TRUE),
       mean_estimate = mean(estimate, na.rm = TRUE),
       bias = mean(estimate - true, na.rm = TRUE),
       relative_bias = if (isTRUE(all.equal(true, 0))) NA_real_ else mean((estimate - true) / true, na.rm = TRUE),
@@ -179,6 +180,36 @@ summarize_sem_results <- function(results, metrics = default_metrics("sem")) {
     "parameter_conditions", "term", "true_value", "reps", metrics
   ))
   out[, intersect(keep, names(out)), drop = FALSE]
+}
+
+replication_status <- function(results, condition_id) {
+  rows <- results[results$condition_id == condition_id, , drop = FALSE]
+  if (!nrow(rows)) {
+    return(data.frame(
+      rep_id = integer(),
+      converged = logical(),
+      improper_solution = logical(),
+      stringsAsFactors = FALSE
+    ))
+  }
+  pieces <- split(rows, rows$rep_id, drop = TRUE)
+  out <- lapply(pieces, function(dat) {
+    improper <- if ("improper_solution" %in% names(dat)) {
+      vals <- dat$improper_solution
+      if (all(is.na(vals))) NA else any(vals, na.rm = TRUE)
+    } else {
+      NA
+    }
+    data.frame(
+      rep_id = dat$rep_id[[1L]],
+      converged = any(dat$converged, na.rm = TRUE),
+      improper_solution = improper,
+      stringsAsFactors = FALSE
+    )
+  })
+  out <- do.call(rbind, out)
+  rownames(out) <- NULL
+  out
 }
 
 markdown_table <- function(tab, caption = NULL) {
